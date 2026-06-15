@@ -1,0 +1,12 @@
+{
+  "name": "quizarena-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "QuizArena frontend monorepo (pnpm workspaces)",
+  "packageManager": "pnpm@9",
+  "scripts": {
+    "web": "pnpm --filter @quizarena/web dev",
+    "telegram": "pnpm --filter @quizarena/telegram dev",
+    "native": "pnpm --filter @quizarena/native start"
+  }
+}

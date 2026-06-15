@@ -1,0 +1,27 @@
+# Go
+/server/bin/
+/server/tmp/
+/server/server
+/server/cmd/server/server
+*.exe
+*.test
+*.out
+
+# env / sirlar
+.env
+.env.local
+
+# Node / pnpm
+node_modules/
+dist/
+build/
+.pnpm-store/
+
+# React Native / Expo
+.expo/
+*.jks
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
