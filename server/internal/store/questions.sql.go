@@ -154,3 +154,49 @@ func (q *Queries) RandomQuestionsByCategory(ctx context.Context, arg RandomQuest
 	}
 	return items, nil
 }
+
+const randomQuestionsBySubject = `-- name: RandomQuestionsBySubject :many
+SELECT q.id, q.category_id, q.type, q.prompt, q.options, q.correct, q.accept, q.media_url, q.explanation, q.difficulty, q.meta, q.created_at FROM questions q
+JOIN categories c ON c.id = q.category_id
+WHERE c.subject_id = $1
+ORDER BY random()
+LIMIT $2
+`
+
+type RandomQuestionsBySubjectParams struct {
+	SubjectID uuid.UUID `json:"subject_id"`
+	Limit     int32     `json:"limit"`
+}
+
+func (q *Queries) RandomQuestionsBySubject(ctx context.Context, arg RandomQuestionsBySubjectParams) ([]Question, error) {
+	rows, err := q.db.Query(ctx, randomQuestionsBySubject, arg.SubjectID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.CategoryID,
+			&i.Type,
+			&i.Prompt,
+			&i.Options,
+			&i.Correct,
+			&i.Accept,
+			&i.MediaUrl,
+			&i.Explanation,
+			&i.Difficulty,
+			&i.Meta,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

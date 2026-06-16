@@ -53,6 +53,12 @@ func main() {
 	} else {
 		registry.Register("english", ev)
 	}
+	registry.Register("math", providers.NewMath())
+	if gen, err := queries.GetSubjectBySlug(context.Background(), "general"); err != nil {
+		logger.Warn("general soha topilmadi — `make seed` ishga tushiring", "err", err)
+	} else {
+		registry.Register("general", providers.NewGeneral(queries, gen.ID))
+	}
 
 	persister := persist.NewDB(queries)
 	engine := game.NewEngine(hub, liveStore, registry, persister, logger)

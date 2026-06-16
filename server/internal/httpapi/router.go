@@ -47,6 +47,14 @@ func Router(d Deps) http.Handler {
 		})
 	}
 
+	if d.Queries != nil {
+		sh := &subjectsHandler{q: d.Queries, logger: d.Logger}
+		r.Route("/api/subjects", func(r chi.Router) {
+			r.Get("/", sh.list)
+			r.Get("/{id}/categories", sh.categories)
+		})
+	}
+
 	if d.Auth != nil && d.Queries != nil {
 		mh := &meHandler{q: d.Queries, logger: d.Logger}
 		r.Route("/api/me", func(r chi.Router) {
@@ -54,8 +62,6 @@ func Router(d Deps) http.Handler {
 			r.Get("/history", mh.history)
 		})
 	}
-
-	// TODO(Bosqich 1+): /api/subjects, ... (PLAN.md §8)
 
 	return r
 }

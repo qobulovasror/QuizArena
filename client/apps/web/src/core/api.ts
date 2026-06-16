@@ -13,6 +13,13 @@ export interface AuthResp {
   user: User;
 }
 
+export interface SubjectInfo {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string | null;
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(path, {
     method: "POST",
@@ -26,10 +33,17 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+async function get<T>(path: string): Promise<T> {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error("so'rov xatosi");
+  return r.json() as Promise<T>;
+}
+
 export const api = {
   guest: () => post<AuthResp>("/api/auth/guest", {}),
   register: (username: string, email: string, password: string) =>
     post<AuthResp>("/api/auth/register", { username, email, password }),
   login: (email: string, password: string) =>
     post<AuthResp>("/api/auth/login", { email, password }),
+  subjects: () => get<SubjectInfo[]>("/api/subjects"),
 };

@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../core/store";
 import { Card } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { cn } from "../lib/cn";
+import type { QuestionShowData, QuestionRevealData } from "../core/protocol";
 
 export function PlayPage() {
   const { countdown, question, reveal, answeredIndex, answer, room } = useGame();
@@ -22,43 +25,25 @@ export function PlayPage() {
   }
 
   const revealed = !!reveal && reveal.index === question.index;
-  const correctId = revealed ? (reveal!.correct as { optionId?: string }).optionId : undefined;
   const answered = answeredIndex === question.index;
   const timePerQ = room?.config.timePerQ ?? 15;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>
-          Savol {question.index + 1} / {question.total}
-        </span>
+      <div className="text-sm text-slate-500">
+        Savol {question.index + 1} / {question.total}
       </div>
 
       {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={timePerQ * 1000} />}
 
       <Card>
         <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>
-        <div className="grid gap-3">
-          {question.options?.map((o) => {
-            const isCorrect = correctId === o.id;
-            return (
-              <button
-                key={o.id}
-                disabled={answered || revealed}
-                onClick={() => answer(o.id)}
-                className={cn(
-                  "rounded-xl border px-4 py-3 text-left text-sm font-medium transition",
-                  revealed && isCorrect && "border-green-500 bg-green-50 text-green-700",
-                  revealed && !isCorrect && "border-slate-200 opacity-60",
-                  !revealed && "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50",
-                  answered && !revealed && "opacity-70",
-                )}
-              >
-                {o.text}
-              </button>
-            );
-          })}
-        </div>
+        <QuestionBody
+          question={question}
+          reveal={revealed ? reveal! : null}
+          disabled={answered || revealed}
+          onAnswer={answer}
+        />
         {answered && !revealed && (
           <p className="mt-4 text-center text-sm text-indigo-600">Javob qabul qilindi ✓</p>
         )}
@@ -69,6 +54,104 @@ export function PlayPage() {
           {reveal!.explanation && <p className="text-sm text-slate-600">{reveal!.explanation}</p>}
           <Leaderboard entries={reveal!.leaderboard} selfId={useGame.getState().selfUserId} />
         </Card>
+      )}
+    </div>
+  );
+}
+
+function QuestionBody({
+  question,
+  reveal,
+  disabled,
+  onAnswer,
+}: {
+  question: QuestionShowData;
+  reveal: QuestionRevealData | null;
+  disabled: boolean;
+  onAnswer: (choice: unknown) => void;
+}) {
+  const correct = (reveal?.correct ?? {}) as { optionId?: string; value?: number | boolean };
+
+  if (question.type === "true_false") {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: "To'g'ri ✓", val: true },
+          { label: "Noto'g'ri ✕", val: false },
+        ].map((b) => (
+          <button
+            key={b.label}
+            disabled={disabled}
+            onClick={() => onAnswer({ value: b.val })}
+            className={cn(
+              "rounded-xl border px-4 py-4 text-sm font-medium transition",
+              reveal && correct.value === b.val && "border-green-500 bg-green-50 text-green-700",
+              !reveal && "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50",
+            )}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (question.type === "numeric") {
+    return <NumericBody reveal={reveal} disabled={disabled} onAnswer={onAnswer} />;
+  }
+
+  // mcq (standart)
+  return (
+    <div className="grid gap-3">
+      {question.options?.map((o) => {
+        const isCorrect = correct.optionId === o.id;
+        return (
+          <button
+            key={o.id}
+            disabled={disabled}
+            onClick={() => onAnswer({ optionId: o.id })}
+            className={cn(
+              "rounded-xl border px-4 py-3 text-left text-sm font-medium transition",
+              reveal && isCorrect && "border-green-500 bg-green-50 text-green-700",
+              reveal && !isCorrect && "border-slate-200 opacity-60",
+              !reveal && "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50",
+            )}
+          >
+            {o.text}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NumericBody({
+  reveal,
+  disabled,
+  onAnswer,
+}: {
+  reveal: QuestionRevealData | null;
+  disabled: boolean;
+  onAnswer: (choice: unknown) => void;
+}) {
+  const [val, setVal] = useState("");
+  const correct = (reveal?.correct ?? {}) as { value?: number };
+  return (
+    <div className="space-y-3">
+      <Input
+        type="number"
+        value={val}
+        disabled={disabled}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder="Javobni kiriting"
+        className="text-center text-lg"
+      />
+      {reveal ? (
+        <p className="text-center text-sm text-green-700">To'g'ri javob: {correct.value}</p>
+      ) : (
+        <Button className="w-full" disabled={disabled || val === ""} onClick={() => onAnswer({ value: Number(val) })}>
+          Javob berish
+        </Button>
       )}
     </div>
   );

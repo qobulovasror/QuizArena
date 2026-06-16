@@ -15,3 +15,10 @@ RETURNING *;
 
 -- name: CountQuestionsByCategory :one
 SELECT count(*) FROM questions WHERE category_id = $1;
+
+-- name: RandomQuestionsBySubject :many
+SELECT q.* FROM questions q
+JOIN categories c ON c.id = q.category_id
+WHERE c.subject_id = $1
+ORDER BY random()
+LIMIT $2;

@@ -21,8 +21,8 @@ const (
 
 // Option — client'ga ko'rinadigan variant (to'g'ri javob YO'Q).
 type Option struct {
-	ID   string
-	Text string
+	ID   string `json:"id"`
+	Text string `json:"text"`
 }
 
 // Question — savol bankidan kelgan shakl (provider qaytaradi).

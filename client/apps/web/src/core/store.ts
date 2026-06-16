@@ -9,11 +9,13 @@ import type {
   GameOverData,
   ErrorData,
 } from "./protocol";
-import type { User } from "./api";
+import { api } from "./api";
+import type { User, SubjectInfo } from "./api";
 
 let socket: WebSocket | null = null;
 
 interface CreateOpts {
+  subjectId: string;
   questionCount: number;
   timePerQ: number;
 }
@@ -34,15 +36,17 @@ interface GameStore {
   answeredIndex: number | null;
   reveal: QuestionRevealData | null;
   gameOver: GameOverData | null;
+  subjects: SubjectInfo[];
 
   // amallar
   setDisplayName: (n: string) => void;
   setAuth: (token: string, user: User) => void;
   connect: () => void;
+  loadSubjects: () => Promise<void>;
   createRoom: (opts: CreateOpts) => void;
   joinRoom: (code: string) => void;
   start: () => void;
-  answer: (optionId: string) => void;
+  answer: (choice: unknown) => void;
   clearError: () => void;
   newGame: () => void;
 }
@@ -66,8 +70,17 @@ export const useGame = create<GameStore>((set, get) => ({
   answeredIndex: null,
   reveal: null,
   gameOver: null,
+  subjects: [],
 
   setDisplayName: (n) => set({ displayName: n }),
+
+  loadSubjects: async () => {
+    try {
+      set({ subjects: await api.subjects() });
+    } catch {
+      /* sohalar yuklanmadi — jim o'tamiz */
+    }
+  },
 
   setAuth: (token, user) => set({ token, user }),
 
@@ -93,9 +106,9 @@ export const useGame = create<GameStore>((set, get) => ({
     };
   },
 
-  createRoom: ({ questionCount, timePerQ }) =>
+  createRoom: ({ subjectId, questionCount, timePerQ }) =>
     send("room:create", {
-      subjectId: "english",
+      subjectId,
       mode: "classic",
       questionCount,
       timePerQ,
@@ -107,10 +120,10 @@ export const useGame = create<GameStore>((set, get) => ({
 
   start: () => send("game:start", {}),
 
-  answer: (optionId) => {
+  answer: (choice) => {
     const q = get().question;
     if (!q || get().answeredIndex === q.index) return;
-    send("answer:submit", { questionIndex: q.index, choice: { optionId } });
+    send("answer:submit", { questionIndex: q.index, choice });
     set({ answeredIndex: q.index });
   },
 
