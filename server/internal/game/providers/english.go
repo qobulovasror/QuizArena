@@ -61,11 +61,12 @@ func (e *EnglishVerb) one(idx int) state.Question {
 		correct, other, label = v.PS, v.PP, "Past Simple (V2)"
 	}
 
-	texts := e.options(v, correct, other)
+	texts := e.options(v, correct, other) // texts[0] — to'g'ri javob
 	opts := make([]state.Option, len(texts))
 	for i, t := range texts {
-		opts[i] = state.Option{ID: fmt.Sprintf("o%d", i), Text: t, Correct: strings.EqualFold(t, correct)}
+		opts[i] = state.Option{ID: fmt.Sprintf("o%d", i), Text: t}
 	}
+	correctJSON, _ := json.Marshal(map[string]string{"optionId": "o0"})
 
 	return state.Question{
 		ID:          fmt.Sprintf("en-%s-%d", strings.ToLower(v.Word), idx),
@@ -73,6 +74,7 @@ func (e *EnglishVerb) one(idx int) state.Question {
 		Prompt:      fmt.Sprintf("«%s» fe'lining %s shakli?", v.Word, label),
 		Explanation: fmt.Sprintf("%s → %s → %s — %s", v.Word, v.PS, v.PP, v.Translation.Uzbek),
 		Options:     opts,
+		Correct:     correctJSON,
 	}
 }
 

@@ -3,7 +3,6 @@ package game
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"math/rand"
 	"sort"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/azizbek12234/quizarena/server/internal/game/modes"
+	"github.com/azizbek12234/quizarena/server/internal/game/qtype"
 	"github.com/azizbek12234/quizarena/server/internal/state"
 	"github.com/azizbek12234/quizarena/server/internal/ws"
 )
@@ -200,6 +201,12 @@ func (e *Engine) SubmitAnswer(c *ws.Client, d ws.AnswerSubmitData) {
 	}
 	q := room.Questions[room.CurrentIdx]
 	now := nowMs()
+	p := room.Players[userID]
+	if p != nil && p.Eliminated {
+		room.Mu.Unlock()
+		c.SendError(ws.ErrBadRequest, "o'yindan chiqdingiz")
+		return
+	}
 	if now > q.Deadline {
 		room.Mu.Unlock()
 		c.SendError(ws.ErrDeadlinePassed, "vaqt tugadi")
@@ -212,12 +219,10 @@ func (e *Engine) SubmitAnswer(c *ws.Client, d ws.AnswerSubmitData) {
 	}
 	q.Answered[userID] = true
 
-	correct := isCorrect(q, d.Choice)
-	if p := room.Players[userID]; p != nil {
-		if correct {
-			p.Score += scoreFor(q, now)
-			p.CorrectCnt++
-		}
+	// Server-authoritative: tur strategiyasi baholaydi, metod strategiyasi ballaydi.
+	correct := qtype.For(q.Type).Validate(d.Choice, q.Correct)
+	if p != nil {
+		modes.For(room.Config.Mode).OnAnswer(p, q, correct, now)
 	}
 	room.Mu.Unlock()
 
@@ -267,6 +272,7 @@ func (e *Engine) run(room *state.Room) {
 	room.Mu.RLock()
 	total := len(room.Questions)
 	timePerQ := room.Config.TimePerQ
+	mode := modes.For(room.Config.Mode)
 	room.Mu.RUnlock()
 
 	for idx := 0; idx < total; idx++ {
@@ -285,10 +291,13 @@ func (e *Engine) run(room *state.Room) {
 
 		e.hub.BroadcastMsg(sessionID, ws.SQuestionReveal, ws.QuestionRevealData{
 			Index:       idx,
-			Correct:     mustJSON(map[string]string{"optionId": q.CorrectID()}),
+			Correct:     q.Correct, // tur-spetsifik to'g'ri javob (reveal shakli)
 			Explanation: q.Explanation,
 			Leaderboard: e.leaderboard(room),
 		})
+		if mode.EndEarly(room) { // survival: bittadan kam tirik qolsa
+			break
+		}
 		time.Sleep(e.RevealGap)
 	}
 
@@ -393,36 +402,6 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 	return entries
 }
 
-// scoreFor — ball: 100 baza + tezlik bonusi (0..100). Faqat to'g'ri javobga.
-func scoreFor(q *state.LiveQuestion, now int64) float64 {
-	const base = 100.0
-	total := float64(q.Deadline - q.AskedAt)
-	if total <= 0 {
-		return base
-	}
-	remaining := float64(q.Deadline - now)
-	if remaining < 0 {
-		remaining = 0
-	}
-	return base + base*(remaining/total)
-}
-
-// isCorrect — mcq uchun tanlangan optionId to'g'rimi (server-authoritative).
-func isCorrect(q *state.LiveQuestion, choice json.RawMessage) bool {
-	var ch struct {
-		OptionID string `json:"optionId"`
-	}
-	if err := json.Unmarshal(choice, &ch); err != nil {
-		return false
-	}
-	for _, o := range q.Options {
-		if o.ID == ch.OptionID {
-			return o.Correct
-		}
-	}
-	return false
-}
-
 func buildLive(qs []state.Question) []*state.LiveQuestion {
 	live := make([]*state.LiveQuestion, len(qs))
 	for i, q := range qs {
@@ -451,11 +430,6 @@ func playerID(c *ws.Client) string {
 		return id
 	}
 	return uuid.NewString()
-}
-
-func mustJSON(v any) json.RawMessage {
-	b, _ := json.Marshal(v)
-	return b
 }
 
 func orDefault(s, def string) string {

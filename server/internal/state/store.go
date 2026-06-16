@@ -6,6 +6,7 @@
 package state
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -18,20 +19,22 @@ const (
 	Finished Status = "finished"
 )
 
-// Option — variant. `Correct` faqat serverda; client'ga hech qachon yuborilmaydi.
+// Option — client'ga ko'rinadigan variant (to'g'ri javob YO'Q).
 type Option struct {
-	ID      string
-	Text    string
-	Correct bool
+	ID   string
+	Text string
 }
 
 // Question — savol bankidan kelgan shakl (provider qaytaradi).
+// `Correct` — tur-spetsifik to'g'ri javob (reveal shakli), FAQAT serverda.
+// QuestionType strategiyasi uni Validate/Reveal uchun ishlatadi (qarang game/qtype).
 type Question struct {
 	ID          string
 	Type        string
 	Prompt      string
 	Explanation string
-	Options     []Option
+	Options     []Option        // mcq/multi_select uchun (true_false/numeric uchun bo'sh)
+	Correct     json.RawMessage // masalan {"optionId":"o2"} | {"value":12,"tolerance":0.5}
 }
 
 // LiveQuestion — o'yin davomidagi savol holati.
@@ -40,16 +43,6 @@ type LiveQuestion struct {
 	AskedAt  int64           // epoch ms
 	Deadline int64           // epoch ms
 	Answered map[string]bool // userID -> javob berdi
-}
-
-// CorrectID — to'g'ri variant id'si (mcq uchun).
-func (q *LiveQuestion) CorrectID() string {
-	for _, o := range q.Options {
-		if o.Correct {
-			return o.ID
-		}
-	}
-	return ""
 }
 
 type Player struct {
@@ -61,6 +54,7 @@ type Player struct {
 	IsBot      bool
 	JoinedAt   int64
 	Persistent bool // tokenli (haqiqiy users yozuvi) → natija DB'ga yoziladi
+	Eliminated bool // survival rejimi: xato javobdan keyin o'yindan chiqdi
 }
 
 type Config struct {

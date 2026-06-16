@@ -4,22 +4,36 @@
 // Bosqich 1+ da EnglishVerbProvider (irregularVerb.json) + DB seed qo'shiladi.
 package providers
 
-import "github.com/azizbek12234/quizarena/server/internal/state"
+import (
+	"encoding/json"
+
+	"github.com/azizbek12234/quizarena/server/internal/state"
+)
 
 // Sample — vaqtinchalik namuna provider (bir nechta mcq savol).
 type Sample struct{}
 
 func NewSample() Sample { return Sample{} }
 
+// mcq — variantli savol quradi; correctIdx — to'g'ri variant indeksi.
+func mcq(id, prompt, explanation string, correctIdx int, texts ...string) state.Question {
+	ids := []string{"a", "b", "c", "d", "e"}
+	options := make([]state.Option, len(texts))
+	for i, t := range texts {
+		options[i] = state.Option{ID: ids[i], Text: t}
+	}
+	correct, _ := json.Marshal(map[string]string{"optionId": ids[correctIdx]})
+	return state.Question{
+		ID: id, Type: "mcq", Prompt: prompt, Explanation: explanation,
+		Options: options, Correct: correct,
+	}
+}
+
 var sampleBank = []state.Question{
-	{ID: "s1", Type: "mcq", Prompt: "2 + 2 = ?", Explanation: "Oddiy qo'shish.",
-		Options: []state.Option{{ID: "a", Text: "3"}, {ID: "b", Text: "4", Correct: true}, {ID: "c", Text: "5"}, {ID: "d", Text: "22"}}},
-	{ID: "s2", Type: "mcq", Prompt: "Past simple of 'go'?", Explanation: "go → went → gone.",
-		Options: []state.Option{{ID: "a", Text: "goed"}, {ID: "b", Text: "gone"}, {ID: "c", Text: "went", Correct: true}, {ID: "d", Text: "going"}}},
-	{ID: "s3", Type: "mcq", Prompt: "O'zbekiston poytaxti?", Explanation: "Toshkent.",
-		Options: []state.Option{{ID: "a", Text: "Samarqand"}, {ID: "b", Text: "Toshkent", Correct: true}, {ID: "c", Text: "Buxoro"}, {ID: "d", Text: "Xiva"}}},
-	{ID: "s4", Type: "mcq", Prompt: "HTTP qaysi portda (standart)?", Explanation: "80.",
-		Options: []state.Option{{ID: "a", Text: "21"}, {ID: "b", Text: "443"}, {ID: "c", Text: "80", Correct: true}, {ID: "d", Text: "8080"}}},
+	mcq("s1", "2 + 2 = ?", "Oddiy qo'shish.", 1, "3", "4", "5", "22"),
+	mcq("s2", "Past simple of 'go'?", "go → went → gone.", 2, "goed", "gone", "went", "going"),
+	mcq("s3", "O'zbekiston poytaxti?", "Toshkent.", 1, "Samarqand", "Toshkent", "Buxoro", "Xiva"),
+	mcq("s4", "HTTP standart porti?", "80.", 2, "21", "443", "80", "8080"),
 }
 
 // Questions — so'ralgan sondagi savol qaytaradi (bank kichik bo'lsa aylantiradi).

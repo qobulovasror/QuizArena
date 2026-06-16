@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -26,12 +27,18 @@ func TestEnglishVerbGenerates(t *testing.T) {
 		if len(q.Options) != 4 {
 			t.Fatalf("4 variant kutilgan, %d", len(q.Options))
 		}
-		// Aniq bitta to'g'ri variant.
-		correct := 0
+		// Correct optionId aniq bitta variantga mos va variantlar takrorsiz.
+		var cc struct {
+			OptionID string `json:"optionId"`
+		}
+		if err := json.Unmarshal(q.Correct, &cc); err != nil || cc.OptionID == "" {
+			t.Fatalf("Correct yaroqsiz: %s (%s)", q.Correct, q.Prompt)
+		}
+		found := 0
 		seen := map[string]bool{}
 		for _, o := range q.Options {
-			if o.Correct {
-				correct++
+			if o.ID == cc.OptionID {
+				found++
 			}
 			low := strings.ToLower(o.Text)
 			if seen[low] {
@@ -39,8 +46,8 @@ func TestEnglishVerbGenerates(t *testing.T) {
 			}
 			seen[low] = true
 		}
-		if correct != 1 {
-			t.Fatalf("aniq 1 to'g'ri kutilgan, %d (%s)", correct, q.Prompt)
+		if found != 1 {
+			t.Fatalf("Correct id aniq 1 variantga mos kelishi kerak, %d (%s)", found, q.Prompt)
 		}
 	}
 }

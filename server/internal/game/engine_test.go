@@ -49,6 +49,25 @@ func dialWSWith(t *testing.T, e *Engine, authFn ws.AuthFunc) *websocket.Conn {
 	return conn
 }
 
+func jraw(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
+
+// correctOptionID — server holatidan birinchi savolning to'g'ri optionId'sini oladi (oq-quti).
+func correctOptionID(t *testing.T, store *state.MemStore, sessionID string) string {
+	t.Helper()
+	room, ok := store.Get(sessionID)
+	if !ok {
+		t.Fatal("xona topilmadi")
+	}
+	room.Mu.RLock()
+	raw := room.Questions[0].Correct
+	room.Mu.RUnlock()
+	var cc struct {
+		OptionID string `json:"optionId"`
+	}
+	_ = json.Unmarshal(raw, &cc)
+	return cc.OptionID
+}
+
 func send(t *testing.T, conn *websocket.Conn, typ ws.MsgType, data any) {
 	t.Helper()
 	body, _ := json.Marshal(data)
@@ -100,16 +119,9 @@ func TestFullGameFlow(t *testing.T) {
 	}
 
 	// To'g'ri variant id'sini server holatidan olamiz (oq-quti tekshiruv).
-	room, ok := store.Get(rj.SessionID)
-	if !ok {
-		t.Fatal("xona topilmadi")
-	}
-	room.Mu.RLock()
-	correctID := room.Questions[0].CorrectID()
-	room.Mu.RUnlock()
-
+	correctID := correctOptionID(t, store, rj.SessionID)
 	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{
-		QuestionIndex: 0, Choice: mustJSON(map[string]string{"optionId": correctID}),
+		QuestionIndex: 0, Choice: jraw(map[string]string{"optionId": correctID}),
 	})
 	expect(t, conn, ws.SAnswerAck)
 
@@ -225,15 +237,10 @@ func TestPersistOnGameEnd(t *testing.T) {
 	expect(t, conn, ws.SRoomState)
 
 	send(t, conn, ws.CGameStart, struct{}{})
-	show := expect(t, conn, ws.SQuestionShow)
-	room, _ := store.Get(rj.SessionID)
-	room.Mu.RLock()
-	correctID := room.Questions[0].CorrectID()
-	room.Mu.RUnlock()
-	_ = show
-
+	expect(t, conn, ws.SQuestionShow)
+	correctID := correctOptionID(t, store, rj.SessionID)
 	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{
-		QuestionIndex: 0, Choice: mustJSON(map[string]string{"optionId": correctID}),
+		QuestionIndex: 0, Choice: jraw(map[string]string{"optionId": correctID}),
 	})
 	expect(t, conn, ws.SAnswerAck)
 	expect(t, conn, ws.SQuestionReveal)
@@ -256,18 +263,5 @@ func TestPersistOnGameEnd(t *testing.T) {
 	}
 	if rec.Results[0].CorrectCnt != 1 {
 		t.Fatalf("correctCnt 1 kutilgan: %+v", rec.Results[0])
-	}
-}
-
-// Ball: to'g'ri javob 100..200; tezroq = ko'proq.
-func TestScoreFor(t *testing.T) {
-	q := &state.LiveQuestion{AskedAt: 0, Deadline: 1000}
-	fast := scoreFor(q, 0)   // darhol
-	slow := scoreFor(q, 900) // deyarli deadline
-	if fast < 199 || fast > 201 {
-		t.Fatalf("tez javob ~200 kutilgan, %v", fast)
-	}
-	if slow <= 100 || slow >= fast {
-		t.Fatalf("sekin javob 100<slow<fast kutilgan, %v", slow)
 	}
 }
