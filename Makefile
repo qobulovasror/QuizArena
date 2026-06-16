@@ -1,4 +1,9 @@
-.PHONY: run build tidy sqlc migrate-up migrate-down up down
+.PHONY: tools run build tidy sqlc migrate-up migrate-down up down
+
+# Kerakli CLI vositalarini o'rnatish (sqlc, goose)
+tools:
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	go install github.com/pressly/goose/v3/cmd/goose@latest
 
 # Go serverni lokal ishga tushirish (skelet)
 run:
