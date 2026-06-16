@@ -7,14 +7,16 @@ import { ResultPage } from "./pages/ResultPage";
 export default function App() {
   const token = useGame((s) => s.token);
   const gameOver = useGame((s) => s.gameOver);
-  const running = useGame((s) => s.room?.status === "running");
+  const inGame = useGame(
+    (s) => s.room?.status === "running" || s.countdown !== null || s.question !== null,
+  );
   const error = useGame((s) => s.error);
   const clearError = useGame((s) => s.clearError);
 
   let screen: JSX.Element;
   if (!token) screen = <AuthPage />;
   else if (gameOver) screen = <ResultPage />;
-  else if (running) screen = <PlayPage />;
+  else if (inGame) screen = <PlayPage />;
   else screen = <LobbyPage />;
 
   return (

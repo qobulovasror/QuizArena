@@ -106,6 +106,7 @@ func TestFullGameFlow(t *testing.T) {
 	expect(t, conn, ws.SRoomState)
 
 	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // status=running
 
 	show := expect(t, conn, ws.SQuestionShow)
 	var qs ws.QuestionShowData
@@ -152,6 +153,7 @@ func TestEnglishGameQuestion(t *testing.T) {
 	expect(t, conn, ws.SRoomState)
 
 	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // status=running
 	show := expect(t, conn, ws.SQuestionShow)
 	var qs ws.QuestionShowData
 	_ = json.Unmarshal(show.Data, &qs)
@@ -237,6 +239,7 @@ func TestPersistOnGameEnd(t *testing.T) {
 	expect(t, conn, ws.SRoomState)
 
 	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // status=running
 	expect(t, conn, ws.SQuestionShow)
 	correctID := correctOptionID(t, store, rj.SessionID)
 	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{

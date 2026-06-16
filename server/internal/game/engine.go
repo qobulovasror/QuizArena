@@ -177,6 +177,7 @@ func (e *Engine) StartGame(c *ws.Client) {
 	room.StartedAt = time.Now()
 	room.Mu.Unlock()
 
+	e.broadcastState(room) // status=running → clientlar Play ekraniga o'tadi
 	go e.run(room)
 }
 
