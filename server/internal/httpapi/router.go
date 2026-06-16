@@ -12,6 +12,7 @@ import (
 
 	"github.com/azizbek12234/quizarena/server/internal/auth"
 	"github.com/azizbek12234/quizarena/server/internal/config"
+	"github.com/azizbek12234/quizarena/server/internal/store"
 	"github.com/azizbek12234/quizarena/server/internal/ws"
 )
 
@@ -21,6 +22,7 @@ type Deps struct {
 	Hub      *ws.Hub
 	WSRouter ws.Router
 	Auth     *auth.Service
+	Queries  *store.Queries
 	Logger   *slog.Logger
 }
 
@@ -45,7 +47,15 @@ func Router(d Deps) http.Handler {
 		})
 	}
 
-	// TODO(Bosqich 1+): /api/subjects, /api/me/history, ... (PLAN.md §8)
+	if d.Auth != nil && d.Queries != nil {
+		mh := &meHandler{q: d.Queries, logger: d.Logger}
+		r.Route("/api/me", func(r chi.Router) {
+			r.Use(requireAuth(d.Auth))
+			r.Get("/history", mh.history)
+		})
+	}
+
+	// TODO(Bosqich 1+): /api/subjects, ... (PLAN.md §8)
 
 	return r
 }

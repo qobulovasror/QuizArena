@@ -2,6 +2,7 @@
 package game
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"math/rand"
@@ -22,20 +23,22 @@ type Provider interface {
 // Engine — o'yin oqimini boshqaradi. Transport (ws.Hub) va jonli holat (state.Store)
 // ustida ishlaydi; doimiy ma'lumot (DB) keyin (auth bilan) ulanadi.
 type Engine struct {
-	hub      *ws.Hub
-	store    state.Store
-	provider Provider
-	logger   *slog.Logger
+	hub       *ws.Hub
+	store     state.Store
+	registry  *Registry
+	persister Persister // nil bo'lsa saqlamaydi
+	logger    *slog.Logger
 
 	Countdown int           // boshlanish sanog'i (soniya); testda 0
 	RevealGap time.Duration // reveal'dan keyingi pauza
 }
 
-func NewEngine(hub *ws.Hub, store state.Store, provider Provider, logger *slog.Logger) *Engine {
+func NewEngine(hub *ws.Hub, store state.Store, registry *Registry, persister Persister, logger *slog.Logger) *Engine {
 	return &Engine{
 		hub:       hub,
 		store:     store,
-		provider:  provider,
+		registry:  registry,
+		persister: persister,
 		logger:    logger,
 		Countdown: 5,
 		RevealGap: 2 * time.Second,
@@ -74,7 +77,7 @@ func (e *Engine) CreateRoom(c *ws.Client, d ws.RoomCreateData) {
 			Opponent: orDefault(d.Opponent, "human"), QuestionCount: d.QuestionCount, TimePerQ: d.TimePerQ,
 		},
 		Players: map[string]*state.Player{
-			userID: {UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs()},
+			userID: {UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs(), Persistent: c.AuthUserID() != ""},
 		},
 	}
 	e.store.Create(room)
@@ -102,7 +105,7 @@ func (e *Engine) JoinRoom(c *ws.Client, d ws.RoomJoinData) {
 		return
 	}
 	userID := playerID(c)
-	room.Players[userID] = &state.Player{UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs()}
+	room.Players[userID] = &state.Player{UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs(), Persistent: c.AuthUserID() != ""}
 	sessionID := room.SessionID
 	room.Mu.Unlock()
 
@@ -161,7 +164,7 @@ func (e *Engine) StartGame(c *ws.Client) {
 		c.SendError(ws.ErrGameAlreadyStarted, "o'yin allaqachon boshlangan")
 		return
 	}
-	qs, err := e.provider.Questions(room.Config.QuestionCount)
+	qs, err := e.registry.For(room.Config.SubjectID).Questions(room.Config.QuestionCount)
 	if err != nil || len(qs) == 0 {
 		room.Mu.Unlock()
 		c.SendError(ws.ErrInternal, "savollarni olishda xato")
@@ -170,6 +173,7 @@ func (e *Engine) StartGame(c *ws.Client) {
 	room.Questions = buildLive(qs)
 	room.Status = state.Running
 	room.CurrentIdx = 0
+	room.StartedAt = time.Now()
 	room.Mu.Unlock()
 
 	go e.run(room)
@@ -294,8 +298,46 @@ func (e *Engine) run(room *state.Room) {
 
 	e.hub.BroadcastMsg(sessionID, ws.SGameOver, ws.GameOverData{FinalLeaderboard: e.leaderboard(room)})
 
+	e.persist(room)
+
 	// Tugagandan keyin biroz turadi (kech reconnect natijani ko'rsin), so'ng tozalanadi.
 	time.AfterFunc(60*time.Second, func() { e.store.Delete(sessionID) })
+}
+
+// persist — o'yin natijasini doimiy saqlaydi (faqat tokenli/haqiqiy o'yinchilar).
+func (e *Engine) persist(room *state.Room) {
+	if e.persister == nil {
+		return
+	}
+	room.Mu.RLock()
+	host := room.Players[room.HostID]
+	hostPersistent := host != nil && host.Persistent
+	rec := GameRecord{
+		Code: room.Code, HostUserID: room.HostID, SubjectSlug: room.Config.SubjectID,
+		Mode: room.Config.Mode, Opponent: room.Config.Opponent,
+		QuestionCount: room.Config.QuestionCount, TimePerQ: room.Config.TimePerQ,
+		StartedAt: room.StartedAt, FinishedAt: time.Now(),
+	}
+	persistentOf := make(map[string]bool, len(room.Players))
+	for id, p := range room.Players {
+		persistentOf[id] = p.Persistent
+	}
+	room.Mu.RUnlock()
+
+	if !hostPersistent {
+		e.logger.Info("o'yin saqlanmadi (anonim host)", "code", rec.Code)
+		return
+	}
+	for _, entry := range e.leaderboard(room) {
+		if persistentOf[entry.UserID] {
+			rec.Results = append(rec.Results, ResultRecord{
+				UserID: entry.UserID, Score: entry.Score, CorrectCnt: entry.CorrectCnt, Rank: entry.Rank,
+			})
+		}
+	}
+	if err := e.persister.SaveGame(context.Background(), rec); err != nil {
+		e.logger.Error("o'yinni saqlash", "err", err, "code", rec.Code)
+	}
 }
 
 // ---- Yordamchilar ----

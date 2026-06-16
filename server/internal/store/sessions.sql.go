@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -133,6 +134,107 @@ func (q *Queries) InsertAnswerLog(ctx context.Context, arg InsertAnswerLogParams
 		arg.TimeMs,
 	)
 	return err
+}
+
+const insertFinishedSession = `-- name: InsertFinishedSession :one
+INSERT INTO game_sessions (
+    code, host_user_id, subject_id, category_id, mode, opponent,
+    question_count, time_per_q, status, started_at, finished_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'finished', $9, $10)
+RETURNING id, code, host_user_id, subject_id, category_id, mode, opponent, question_count, time_per_q, status, started_at, finished_at, created_at
+`
+
+type InsertFinishedSessionParams struct {
+	Code          string     `json:"code"`
+	HostUserID    uuid.UUID  `json:"host_user_id"`
+	SubjectID     uuid.UUID  `json:"subject_id"`
+	CategoryID    *uuid.UUID `json:"category_id"`
+	Mode          string     `json:"mode"`
+	Opponent      string     `json:"opponent"`
+	QuestionCount int32      `json:"question_count"`
+	TimePerQ      int32      `json:"time_per_q"`
+	StartedAt     *time.Time `json:"started_at"`
+	FinishedAt    *time.Time `json:"finished_at"`
+}
+
+func (q *Queries) InsertFinishedSession(ctx context.Context, arg InsertFinishedSessionParams) (GameSession, error) {
+	row := q.db.QueryRow(ctx, insertFinishedSession,
+		arg.Code,
+		arg.HostUserID,
+		arg.SubjectID,
+		arg.CategoryID,
+		arg.Mode,
+		arg.Opponent,
+		arg.QuestionCount,
+		arg.TimePerQ,
+		arg.StartedAt,
+		arg.FinishedAt,
+	)
+	var i GameSession
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.HostUserID,
+		&i.SubjectID,
+		&i.CategoryID,
+		&i.Mode,
+		&i.Opponent,
+		&i.QuestionCount,
+		&i.TimePerQ,
+		&i.Status,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listHistoryByUser = `-- name: ListHistoryByUser :many
+SELECT gr.score, gr.correct_cnt, gr.rank, gs.code, gs.mode, gs.finished_at, s.slug AS subject_slug
+FROM game_results gr
+JOIN game_sessions gs ON gs.id = gr.session_id
+JOIN subjects s ON s.id = gs.subject_id
+WHERE gr.user_id = $1
+ORDER BY gs.finished_at DESC NULLS LAST
+LIMIT 50
+`
+
+type ListHistoryByUserRow struct {
+	Score       float64    `json:"score"`
+	CorrectCnt  int32      `json:"correct_cnt"`
+	Rank        *int32     `json:"rank"`
+	Code        string     `json:"code"`
+	Mode        string     `json:"mode"`
+	FinishedAt  *time.Time `json:"finished_at"`
+	SubjectSlug string     `json:"subject_slug"`
+}
+
+func (q *Queries) ListHistoryByUser(ctx context.Context, userID uuid.UUID) ([]ListHistoryByUserRow, error) {
+	rows, err := q.db.Query(ctx, listHistoryByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListHistoryByUserRow
+	for rows.Next() {
+		var i ListHistoryByUserRow
+		if err := rows.Scan(
+			&i.Score,
+			&i.CorrectCnt,
+			&i.Rank,
+			&i.Code,
+			&i.Mode,
+			&i.FinishedAt,
+			&i.SubjectSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listResultsBySession = `-- name: ListResultsBySession :many

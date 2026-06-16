@@ -19,6 +19,10 @@ tidy:
 sqlc:
 	cd server && sqlc generate
 
+# Boshlang'ich ma'lumot (english soha/kategoriya) — DATABASE_URL kerak
+seed:
+	cd server && go run ./cmd/seed
+
 # Migratsiya (goose + DATABASE_URL env kerak)
 migrate-up:
 	cd server && goose -dir migrations postgres "$$DATABASE_URL" up

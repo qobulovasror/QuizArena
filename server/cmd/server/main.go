@@ -20,6 +20,7 @@ import (
 	"github.com/azizbek12234/quizarena/server/internal/game"
 	"github.com/azizbek12234/quizarena/server/internal/game/providers"
 	"github.com/azizbek12234/quizarena/server/internal/httpapi"
+	"github.com/azizbek12234/quizarena/server/internal/persist"
 	"github.com/azizbek12234/quizarena/server/internal/state"
 	"github.com/azizbek12234/quizarena/server/internal/store"
 	"github.com/azizbek12234/quizarena/server/internal/ws"
@@ -45,11 +46,20 @@ func main() {
 	// Jonli o'yin (in-memory state + engine).
 	hub := ws.NewHub(logger)
 	liveStore := state.NewMemStore()
-	engine := game.NewEngine(hub, liveStore, providers.NewSample(), logger)
+
+	registry := game.NewRegistry(providers.NewSample()) // noma'lum soha → Sample
+	if ev, err := providers.NewEnglishVerb(); err != nil {
+		logger.Error("english provider yuklanmadi", "err", err)
+	} else {
+		registry.Register("english", ev)
+	}
+
+	persister := persist.NewDB(queries)
+	engine := game.NewEngine(hub, liveStore, registry, persister, logger)
 	gameRouter := game.NewRouter(engine)
 
 	handler := httpapi.Router(httpapi.Deps{
-		Cfg: cfg, Hub: hub, WSRouter: gameRouter, Auth: authSvc, Logger: logger,
+		Cfg: cfg, Hub: hub, WSRouter: gameRouter, Auth: authSvc, Queries: queries, Logger: logger,
 	})
 
 	srv := &http.Server{

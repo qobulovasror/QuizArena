@@ -5,7 +5,10 @@
 // engine kodi o'zgarmaydi.
 package state
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type Status string
 
@@ -57,6 +60,7 @@ type Player struct {
 	Connected  bool
 	IsBot      bool
 	JoinedAt   int64
+	Persistent bool // tokenli (haqiqiy users yozuvi) → natija DB'ga yoziladi
 }
 
 type Config struct {
@@ -80,6 +84,7 @@ type Room struct {
 	Players    map[string]*Player
 	Questions  []*LiveQuestion
 	CurrentIdx int
+	StartedAt  time.Time
 }
 
 // Store — jonli xonalar ombori interfeysi.
