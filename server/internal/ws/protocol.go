@@ -42,11 +42,12 @@ const (
 // ---- Umumiy tuzilmalar ----
 
 type Player struct {
-	UserID    string  `json:"userId"`
-	Name      string  `json:"name"`
-	Score     float64 `json:"score"`
-	Connected bool    `json:"connected"`
-	IsBot     bool    `json:"isBot,omitempty"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	Score      float64 `json:"score"`
+	Connected  bool    `json:"connected"`
+	IsBot      bool    `json:"isBot,omitempty"`
+	Eliminated bool    `json:"eliminated,omitempty"`
 }
 
 type RoomConfig struct {
@@ -68,6 +69,7 @@ type LeaderboardEntry struct {
 	Score      float64 `json:"score"`
 	CorrectCnt int     `json:"correctCnt"`
 	Rank       int     `json:"rank"`
+	Eliminated bool    `json:"eliminated,omitempty"`
 }
 
 // ---- Client → Server yuklar ----

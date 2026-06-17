@@ -378,7 +378,7 @@ func (e *Engine) broadcastState(room *state.Room) {
 	}
 	for _, p := range room.Players {
 		st.Players = append(st.Players, ws.Player{
-			UserID: p.UserID, Name: p.Name, Score: p.Score, Connected: p.Connected, IsBot: p.IsBot,
+			UserID: p.UserID, Name: p.Name, Score: p.Score, Connected: p.Connected, IsBot: p.IsBot, Eliminated: p.Eliminated,
 		})
 	}
 	sessionID := room.SessionID
@@ -391,12 +391,18 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 	entries := make([]ws.LeaderboardEntry, 0, len(room.Players))
 	for _, p := range room.Players {
 		entries = append(entries, ws.LeaderboardEntry{
-			UserID: p.UserID, Name: p.Name, Score: p.Score, CorrectCnt: p.CorrectCnt,
+			UserID: p.UserID, Name: p.Name, Score: p.Score, CorrectCnt: p.CorrectCnt, Eliminated: p.Eliminated,
 		})
 	}
 	room.Mu.RUnlock()
 
-	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Score > entries[j].Score })
+	// Survival: tirik o'yinchilar yuqorida, keyin ball bo'yicha.
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].Eliminated != entries[j].Eliminated {
+			return !entries[i].Eliminated
+		}
+		return entries[i].Score > entries[j].Score
+	})
 	for i := range entries {
 		entries[i].Rank = i + 1
 	}

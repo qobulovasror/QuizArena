@@ -24,6 +24,9 @@ export function LobbyPage() {
           <p className="text-sm text-slate-500">Xona kodi</p>
           <div className="text-4xl font-bold tracking-widest text-indigo-600">{room.code}</div>
           <p className="text-xs text-slate-400">Do'stlaringizga kodni ulashing</p>
+          <span className="inline-block rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-600">
+            Rejim: {room.config.mode}
+          </span>
 
           <div className="space-y-1 text-left">
             <p className="text-sm font-medium">O'yinchilar ({room.players.length})</p>
@@ -53,16 +56,22 @@ export function LobbyPage() {
   return <CreateOrJoin onCreate={createRoom} onJoin={joinRoom} />;
 }
 
+const modes = [
+  { id: "classic", name: "Classic", desc: "Hamma javob beradi, tezlik + to'g'rilik" },
+  { id: "survival", name: "Survival", desc: "Xato javob = o'yindan chiqish" },
+];
+
 function CreateOrJoin({
   onCreate,
   onJoin,
 }: {
-  onCreate: (o: { subjectId: string; questionCount: number; timePerQ: number }) => void;
+  onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number }) => void;
   onJoin: (code: string) => void;
 }) {
   const { subjects, loadSubjects, status } = useGame();
   const online = status === "online";
   const [subjectId, setSubjectId] = useState("english");
+  const [mode, setMode] = useState("classic");
   const [count, setCount] = useState(5);
   const [time, setTime] = useState(15);
   const [code, setCode] = useState("");
@@ -95,6 +104,24 @@ function CreateOrJoin({
             </button>
           ))}
         </div>
+        <p className="text-sm text-slate-500">Rejim</p>
+        <div className="grid grid-cols-2 gap-2">
+          {modes.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={cn(
+                "rounded-xl border px-3 py-2 text-left text-sm transition",
+                mode === m.id
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 hover:bg-slate-50",
+              )}
+            >
+              <div className="font-medium">{m.name}</div>
+              <div className="text-xs text-slate-400">{m.desc}</div>
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
             Savol soni
@@ -108,9 +135,9 @@ function CreateOrJoin({
         <Button
           className="w-full"
           disabled={!online}
-          onClick={() => onCreate({ subjectId, questionCount: count, timePerQ: time })}
+          onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time })}
         >
-          Xona yaratish (classic)
+          Xona yaratish
         </Button>
       </Card>
 

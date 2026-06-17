@@ -36,6 +36,7 @@ export type ConnStatus = "offline" | "connecting" | "online" | "reconnecting";
 
 interface CreateOpts {
   subjectId: string;
+  mode: string;
   questionCount: number;
   timePerQ: number;
 }
@@ -63,6 +64,7 @@ interface GameStore {
   myAnswer: MyAnswer | null;
   reveal: QuestionRevealData | null;
   gameOver: GameOverData | null;
+  eliminated: boolean;
   subjects: SubjectInfo[];
 
   setDisplayName: (n: string) => void;
@@ -105,6 +107,7 @@ export const useGame = create<GameStore>((set, get) => ({
   myAnswer: null,
   reveal: null,
   gameOver: null,
+  eliminated: false,
   subjects: [],
 
   setDisplayName: (n) => set({ displayName: n }),
@@ -132,10 +135,10 @@ export const useGame = create<GameStore>((set, get) => ({
     open(set, get, token);
   },
 
-  createRoom: ({ subjectId, questionCount, timePerQ }) =>
+  createRoom: ({ subjectId, mode, questionCount, timePerQ }) =>
     send("room:create", {
       subjectId,
-      mode: "classic",
+      mode,
       questionCount,
       timePerQ,
       displayName: get().displayName || "O'yinchi",
@@ -155,7 +158,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   leaveRoom: () => {
     send("room:leave", {});
-    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null });
+    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false });
   },
 
   logout: () => {
@@ -167,14 +170,14 @@ export const useGame = create<GameStore>((set, get) => ({
     set({
       token: null, user: null, status: "offline",
       room: null, sessionId: null, resumeToken: null,
-      question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null,
+      question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false,
     });
   },
 
   clearError: () => set({ error: null }),
 
   newGame: () =>
-    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null }),
+    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false }),
 }));
 
 function open(set: (p: Partial<GameStore>) => void, get: () => GameStore, token: string) {
@@ -211,11 +214,13 @@ function open(set: (p: Partial<GameStore>) => void, get: () => GameStore, token:
     } catch {
       return;
     }
-    handle(env, set);
+    handle(env, set, get);
   };
 }
 
-function handle(env: Envelope, set: (p: Partial<GameStore>) => void) {
+function handle(env: Envelope, set: (p: Partial<GameStore>) => void, get: () => GameStore) {
+  const amIOut = (board: { userId: string; eliminated?: boolean }[]) =>
+    board.some((e) => e.userId === get().selfUserId && e.eliminated);
   switch (env.type) {
     case "room:joined": {
       const d = env.data as RoomJoinedData;
@@ -240,12 +245,18 @@ function handle(env: Envelope, set: (p: Partial<GameStore>) => void) {
         reveal: null,
       });
       break;
-    case "question:reveal":
-      set({ reveal: env.data as QuestionRevealData });
+    case "question:reveal": {
+      const d = env.data as QuestionRevealData;
+      set({ reveal: d });
+      if (amIOut(d.leaderboard)) set({ eliminated: true });
       break;
-    case "game:over":
-      set({ gameOver: env.data as GameOverData });
+    }
+    case "game:over": {
+      const d = env.data as GameOverData;
+      set({ gameOver: d });
+      if (amIOut(d.finalLeaderboard)) set({ eliminated: true });
       break;
+    }
     case "error": {
       const e = env.data as ErrorData;
       if (e.code === "ROOM_NOT_FOUND") {

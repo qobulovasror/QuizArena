@@ -65,10 +65,10 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 ## 5. Umumiy tuzilmalar
 
 ```
-Player           { userId, name, score, connected, isBot? }
+Player           { userId, name, score, connected, isBot?, eliminated? }
 RoomConfig       { subjectId, mode, questionCount, timePerQ }
 Option           { id, text }              // id — opaque (server shuffle qiladi)
-LeaderboardEntry { userId, name, score, correctCnt, rank }
+LeaderboardEntry { userId, name, score, correctCnt, rank, eliminated? }   // eliminated: survival
 ```
 
 ## 6. Savol turiga qarab `choice` / `correct` shakli

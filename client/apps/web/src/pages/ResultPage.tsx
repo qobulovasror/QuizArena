@@ -18,12 +18,12 @@ export function ResultPage() {
             key={e.userId}
             className={cn(
               "flex items-center justify-between rounded-xl px-4 py-3",
-              e.userId === selfUserId ? "bg-indigo-50 font-semibold" : "bg-slate-50",
+              e.eliminated ? "bg-slate-50 text-slate-400" : e.userId === selfUserId ? "bg-indigo-50 font-semibold" : "bg-slate-50",
             )}
           >
             <span className="flex items-center gap-2">
-              <span className="w-6 text-center">{medals[e.rank - 1] ?? e.rank}</span>
-              {e.name}
+              <span className="w-6 text-center">{e.eliminated ? "💀" : (medals[e.rank - 1] ?? e.rank)}</span>
+              <span className={cn(e.eliminated && "line-through")}>{e.name}</span>
             </span>
             <span className="text-indigo-600">{Math.round(e.score)}</span>
           </div>

@@ -15,6 +15,7 @@ export interface Player {
   score: number;
   connected: boolean;
   isBot?: boolean;
+  eliminated?: boolean;
 }
 
 export interface RoomConfig {
@@ -35,6 +36,7 @@ export interface LeaderboardEntry {
   score: number;
   correctCnt: number;
   rank: number;
+  eliminated?: boolean;
 }
 
 export interface RoomStateData {

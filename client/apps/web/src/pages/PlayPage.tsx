@@ -9,7 +9,7 @@ import type { QuestionShowData, QuestionRevealData } from "../core/protocol";
 type Choice = { optionId?: string; value?: number | boolean };
 
 export function PlayPage() {
-  const { countdown, question, reveal, answeredIndex, myAnswer, answer, room, selfUserId } = useGame();
+  const { countdown, question, reveal, answeredIndex, myAnswer, answer, room, selfUserId, eliminated } = useGame();
 
   if (countdown !== null) {
     return (
@@ -38,11 +38,17 @@ export function PlayPage() {
         Savol {question.index + 1} / {question.total}
       </div>
 
+      {eliminated && (
+        <div className="rounded-lg bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-600">
+          Siz o'yindan chiqib ketdingiz — tomoshabin sifatida kuzatyapsiz
+        </div>
+      )}
+
       {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={timePerQ * 1000} />}
 
       <Card>
         <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>
-        <QuestionBody question={question} reveal={revealed ? reveal! : null} myChoice={myChoice} disabled={answered || revealed} onAnswer={answer} />
+        <QuestionBody question={question} reveal={revealed ? reveal! : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
         {answered && !revealed && <p className="mt-4 text-center text-sm text-indigo-600">Javob qabul qilindi ✓</p>}
         {revealed && (
           <p className={cn("mt-4 text-center text-sm font-semibold", iWasRight ? "text-green-600" : "text-red-600")}>
@@ -195,7 +201,7 @@ function Leaderboard({
   entries,
   selfId,
 }: {
-  entries: { userId: string; name: string; score: number; rank: number }[];
+  entries: { userId: string; name: string; score: number; rank: number; eliminated?: boolean }[];
   selfId: string | null;
 }) {
   return (
@@ -205,11 +211,12 @@ function Leaderboard({
           key={e.userId}
           className={cn(
             "flex items-center justify-between rounded-lg px-3 py-1.5 text-sm",
-            e.userId === selfId ? "bg-indigo-50 font-semibold" : "bg-slate-50",
+            e.eliminated ? "bg-slate-50 text-slate-400 line-through" : e.userId === selfId ? "bg-indigo-50 font-semibold" : "bg-slate-50",
           )}
         >
           <span>
             {e.rank}. {e.name}
+            {e.eliminated && <span className="ml-1 no-underline">💀</span>}
           </span>
           <span>{Math.round(e.score)}</span>
         </div>
