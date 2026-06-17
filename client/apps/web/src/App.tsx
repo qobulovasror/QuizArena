@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useGame } from "./core/store";
 import { AuthPage } from "./pages/AuthPage";
 import { LobbyPage } from "./pages/LobbyPage";
@@ -6,12 +7,28 @@ import { ResultPage } from "./pages/ResultPage";
 
 export default function App() {
   const token = useGame((s) => s.token);
+  const status = useGame((s) => s.status);
+  const displayName = useGame((s) => s.displayName);
+  const room = useGame((s) => s.room);
   const gameOver = useGame((s) => s.gameOver);
-  const inGame = useGame(
-    (s) => s.room?.status === "running" || s.countdown !== null || s.question !== null,
-  );
+  const inGame = useGame((s) => s.room?.status === "running" || s.countdown !== null || s.question !== null);
   const error = useGame((s) => s.error);
+  const connect = useGame((s) => s.connect);
   const clearError = useGame((s) => s.clearError);
+  const leaveRoom = useGame((s) => s.leaveRoom);
+  const logout = useGame((s) => s.logout);
+
+  // Saqlangan token bo'lsa — sahifa ochilishida avtomatik ulanamiz.
+  useEffect(() => {
+    if (token) connect();
+  }, [token, connect]);
+
+  // Xatolarni 4 soniyada avto-yopish.
+  useEffect(() => {
+    if (!error) return;
+    const id = setTimeout(clearError, 4000);
+    return () => clearTimeout(id);
+  }, [error, clearError]);
 
   let screen: JSX.Element;
   if (!token) screen = <AuthPage />;
@@ -19,9 +36,36 @@ export default function App() {
   else if (inGame) screen = <PlayPage />;
   else screen = <LobbyPage />;
 
+  const inRoom = !!room || inGame || !!gameOver;
+
   return (
     <div className="min-h-full">
+      {token && (
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 text-sm">
+          <span className="font-semibold text-indigo-600">QuizArena</span>
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500">{displayName || "O'yinchi"}</span>
+            {inRoom ? (
+              <button onClick={leaveRoom} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+                Chiqish
+              </button>
+            ) : (
+              <button onClick={logout} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
+                Hisobdan chiqish
+              </button>
+            )}
+          </div>
+        </header>
+      )}
+
+      {token && status !== "online" && status !== "offline" && (
+        <div className="bg-amber-100 py-1 text-center text-xs text-amber-700">
+          {status === "connecting" ? "Ulanmoqda…" : "Qayta ulanmoqda…"}
+        </div>
+      )}
+
       {screen}
+
       {error && (
         <div
           className="fixed bottom-4 left-1/2 -translate-x-1/2 cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm text-white shadow-lg"

@@ -13,7 +13,8 @@ const fallback = [
 ];
 
 export function LobbyPage() {
-  const { room, selfUserId, createRoom, joinRoom, start, connected } = useGame();
+  const { room, selfUserId, createRoom, joinRoom, start, status } = useGame();
+  const online = status === "online";
 
   if (room && room.status === "lobby") {
     const isHost = selfUserId === room.host;
@@ -38,7 +39,7 @@ export function LobbyPage() {
           </div>
 
           {isHost ? (
-            <Button className="w-full" onClick={start} disabled={!connected}>
+            <Button className="w-full" onClick={start} disabled={!online}>
               O'yinni boshlash
             </Button>
           ) : (
@@ -59,7 +60,8 @@ function CreateOrJoin({
   onCreate: (o: { subjectId: string; questionCount: number; timePerQ: number }) => void;
   onJoin: (code: string) => void;
 }) {
-  const { subjects, loadSubjects } = useGame();
+  const { subjects, loadSubjects, status } = useGame();
+  const online = status === "online";
   const [subjectId, setSubjectId] = useState("english");
   const [count, setCount] = useState(5);
   const [time, setTime] = useState(15);
@@ -103,7 +105,11 @@ function CreateOrJoin({
             <Input type="number" min={5} max={60} value={time} onChange={(e) => setTime(+e.target.value)} />
           </label>
         </div>
-        <Button className="w-full" onClick={() => onCreate({ subjectId, questionCount: count, timePerQ: time })}>
+        <Button
+          className="w-full"
+          disabled={!online}
+          onClick={() => onCreate({ subjectId, questionCount: count, timePerQ: time })}
+        >
           Xona yaratish (classic)
         </Button>
       </Card>
@@ -119,7 +125,7 @@ function CreateOrJoin({
           maxLength={6}
           className="text-center tracking-widest"
         />
-        <Button variant="outline" className="w-full" disabled={code.length < 4} onClick={() => onJoin(code)}>
+        <Button variant="outline" className="w-full" disabled={code.length < 4 || !online} onClick={() => onJoin(code)}>
           Qo'shilish
         </Button>
       </Card>
