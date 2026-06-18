@@ -45,5 +45,6 @@ export const api = {
     post<AuthResp>("/api/auth/register", { username, email, password }),
   login: (email: string, password: string) =>
     post<AuthResp>("/api/auth/login", { email, password }),
+  telegram: (initData: string) => post<AuthResp>("/api/auth/telegram", { initData }),
   subjects: () => get<SubjectInfo[]>("/api/subjects"),
 };

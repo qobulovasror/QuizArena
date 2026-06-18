@@ -11,6 +11,7 @@ import type {
 } from "./protocol";
 import { api } from "./api";
 import type { User, SubjectInfo } from "./api";
+import { getTelegram } from "./telegram";
 
 let socket: WebSocket | null = null;
 let intentional = false; // ataylab yopilganda reconnect qilinmaydi
@@ -69,6 +70,7 @@ interface GameStore {
 
   setDisplayName: (n: string) => void;
   setAuth: (token: string, user: User) => void;
+  telegramLogin: () => Promise<void>;
   connect: () => void;
   loadSubjects: () => Promise<void>;
   createRoom: (opts: CreateOpts) => void;
@@ -115,6 +117,19 @@ export const useGame = create<GameStore>((set, get) => ({
   setAuth: (token, user) => {
     saveAuth(token, user, get().displayName);
     set({ token, user });
+  },
+
+  telegramLogin: async () => {
+    const tg = getTelegram();
+    if (!tg?.initData) return;
+    try {
+      const res = await api.telegram(tg.initData);
+      const name = tg.initDataUnsafe?.user?.first_name || get().displayName || "O'yinchi";
+      set({ displayName: name });
+      get().setAuth(res.token, res.user); // token → App avtomatik ulanadi
+    } catch {
+      /* Telegram auth ishlamadi — oddiy auth ekraniga tushadi */
+    }
   },
 
   loadSubjects: async () => {

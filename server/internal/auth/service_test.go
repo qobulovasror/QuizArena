@@ -36,8 +36,16 @@ func (f *fakeUsers) GetUserByEmail(_ context.Context, email *string) (store.User
 	return u, nil
 }
 
+func (f *fakeUsers) GetUserByTelegramID(context.Context, *int64) (store.User, error) {
+	return store.User{}, pgx.ErrNoRows
+}
+
+func (f *fakeUsers) CreateTelegramUser(_ context.Context, id *int64) (store.User, error) {
+	return store.User{ID: uuid.New(), TelegramID: id, Role: "user"}, nil
+}
+
 func newSvc() *Service {
-	return NewService(newFake(), NewTokenManager("test-secret", time.Hour))
+	return NewService(newFake(), NewTokenManager("test-secret", time.Hour), "")
 }
 
 func TestRegisterLogin(t *testing.T) {

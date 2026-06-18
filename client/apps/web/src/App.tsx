@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useGame } from "./core/store";
+import { getTelegram } from "./core/telegram";
 import { AuthPage } from "./pages/AuthPage";
 import { LobbyPage } from "./pages/LobbyPage";
 import { PlayPage } from "./pages/PlayPage";
@@ -14,9 +15,20 @@ export default function App() {
   const inGame = useGame((s) => s.room?.status === "running" || s.countdown !== null || s.question !== null);
   const error = useGame((s) => s.error);
   const connect = useGame((s) => s.connect);
+  const telegramLogin = useGame((s) => s.telegramLogin);
   const clearError = useGame((s) => s.clearError);
   const leaveRoom = useGame((s) => s.leaveRoom);
   const logout = useGame((s) => s.logout);
+
+  // Telegram Mini App ichida ochilsa — avtomatik kirish (token bo'lmasa).
+  useEffect(() => {
+    const tg = getTelegram();
+    if (tg) {
+      tg.ready();
+      tg.expand?.();
+      if (tg.initData && !useGame.getState().token) telegramLogin();
+    }
+  }, [telegramLogin]);
 
   // Saqlangan token bo'lsa — sahifa ochilishida avtomatik ulanamiz.
   useEffect(() => {

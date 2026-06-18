@@ -73,6 +73,28 @@ func (h *authHandler) register(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, authResp{Token: res.Token, User: toDTO(res.User)})
 }
 
+type telegramReq struct {
+	InitData string `json:"initData" validate:"required"`
+}
+
+func (h *authHandler) telegram(w http.ResponseWriter, r *http.Request) {
+	var req telegramReq
+	if !decodeValidate(w, r, h.validate, &req) {
+		return
+	}
+	res, err := h.svc.Telegram(r.Context(), req.InitData)
+	if errors.Is(err, auth.ErrInvalidInitData) {
+		writeErr(w, http.StatusUnauthorized, "Telegram ma'lumoti yaroqsiz")
+		return
+	}
+	if err != nil {
+		h.logger.Error("telegram", "err", err)
+		writeErr(w, http.StatusInternalServerError, "Telegram orqali kirib bo'lmadi")
+		return
+	}
+	writeJSON(w, http.StatusOK, authResp{Token: res.Token, User: toDTO(res.User)})
+}
+
 func (h *authHandler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
 	if !decodeValidate(w, r, h.validate, &req) {

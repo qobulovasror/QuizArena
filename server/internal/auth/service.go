@@ -23,15 +23,18 @@ type UserStore interface {
 	CreateGuest(ctx context.Context) (store.User, error)
 	CreateAccount(ctx context.Context, arg store.CreateAccountParams) (store.User, error)
 	GetUserByEmail(ctx context.Context, email *string) (store.User, error)
+	GetUserByTelegramID(ctx context.Context, telegramID *int64) (store.User, error)
+	CreateTelegramUser(ctx context.Context, telegramID *int64) (store.User, error)
 }
 
 type Service struct {
-	users  UserStore
-	tokens *TokenManager
+	users    UserStore
+	tokens   *TokenManager
+	botToken string // Telegram initData tekshiruvi uchun ("" bo'lsa telegram o'chiq)
 }
 
-func NewService(users UserStore, tokens *TokenManager) *Service {
-	return &Service{users: users, tokens: tokens}
+func NewService(users UserStore, tokens *TokenManager, botToken string) *Service {
+	return &Service{users: users, tokens: tokens, botToken: botToken}
 }
 
 // Result — foydalanuvchi + sessiya tokeni.
@@ -82,6 +85,24 @@ func (s *Service) Login(ctx context.Context, email, password string) (Result, er
 	}
 	if bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(password)) != nil {
 		return Result{}, ErrInvalidCreds
+	}
+	return s.withToken(u)
+}
+
+// Telegram — Mini App initData'sini tekshirib, telegram_id bo'yicha user topadi/yaratadi.
+func (s *Service) Telegram(ctx context.Context, initData string) (Result, error) {
+	tg, err := ValidateInitData(initData, s.botToken)
+	if err != nil {
+		return Result{}, err
+	}
+	u, err := s.users.GetUserByTelegramID(ctx, &tg.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		u, err = s.users.CreateTelegramUser(ctx, &tg.ID)
+		if err != nil {
+			return Result{}, err
+		}
+	} else if err != nil {
+		return Result{}, err
 	}
 	return s.withToken(u)
 }

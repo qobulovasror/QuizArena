@@ -44,6 +44,7 @@ func Router(d Deps) http.Handler {
 			r.Post("/guest", ah.guest)
 			r.Post("/register", ah.register)
 			r.Post("/login", ah.login)
+			r.Post("/telegram", ah.telegram)
 		})
 	}
 

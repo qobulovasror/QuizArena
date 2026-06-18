@@ -60,6 +60,27 @@ func (q *Queries) CreateGuest(ctx context.Context) (User, error) {
 	return i, err
 }
 
+const createTelegramUser = `-- name: CreateTelegramUser :one
+INSERT INTO users (telegram_id) VALUES ($1)
+RETURNING id, username, email, password_hash, telegram_id, is_guest, role, created_at
+`
+
+func (q *Queries) CreateTelegramUser(ctx context.Context, telegramID *int64) (User, error) {
+	row := q.db.QueryRow(ctx, createTelegramUser, telegramID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.TelegramID,
+		&i.IsGuest,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, username, email, password_hash, telegram_id, is_guest, role, created_at FROM users WHERE email = $1
 `

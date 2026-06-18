@@ -23,6 +23,7 @@ import (
 	"github.com/azizbek12234/quizarena/server/internal/persist"
 	"github.com/azizbek12234/quizarena/server/internal/state"
 	"github.com/azizbek12234/quizarena/server/internal/store"
+	"github.com/azizbek12234/quizarena/server/internal/telegram"
 	"github.com/azizbek12234/quizarena/server/internal/ws"
 )
 
@@ -41,7 +42,7 @@ func main() {
 
 	// Auth (mehmon + akkaunt + JWT).
 	tokens := auth.NewTokenManager(cfg.JWTSecret, 7*24*time.Hour)
-	authSvc := auth.NewService(queries, tokens)
+	authSvc := auth.NewService(queries, tokens, cfg.TelegramBotToken)
 
 	// Jonli o'yin (in-memory state + engine).
 	hub := ws.NewHub(logger)
@@ -63,6 +64,9 @@ func main() {
 	persister := persist.NewDB(queries)
 	engine := game.NewEngine(hub, liveStore, registry, persister, logger)
 	gameRouter := game.NewRouter(engine)
+
+	// Telegram bot (token bo'lsa) — /start → Mini App.
+	go telegram.Run(context.Background(), cfg.TelegramBotToken, cfg.MiniAppURL, logger)
 
 	handler := httpapi.Router(httpapi.Deps{
 		Cfg: cfg, Hub: hub, WSRouter: gameRouter, Auth: authSvc, Queries: queries, Logger: logger,
