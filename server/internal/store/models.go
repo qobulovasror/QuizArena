@@ -68,6 +68,16 @@ type Question struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type SrsCard struct {
+	UserID       uuid.UUID  `json:"user_id"`
+	QuestionID   uuid.UUID  `json:"question_id"`
+	Ease         float64    `json:"ease"`
+	IntervalDays int32      `json:"interval_days"`
+	Repetitions  int32      `json:"repetitions"`
+	DueAt        time.Time  `json:"due_at"`
+	LastReviewed *time.Time `json:"last_reviewed"`
+}
+
 type Subject struct {
 	ID   uuid.UUID `json:"id"`
 	Slug string    `json:"slug"`

@@ -3,6 +3,7 @@ import { useGame } from "./core/store";
 import { getTelegram } from "./core/telegram";
 import { AuthPage } from "./pages/AuthPage";
 import { LobbyPage } from "./pages/LobbyPage";
+import { HomePage } from "./pages/HomePage";
 import { PlayPage } from "./pages/PlayPage";
 import { ResultPage } from "./pages/ResultPage";
 
@@ -46,7 +47,8 @@ export default function App() {
   if (!token) screen = <AuthPage />;
   else if (gameOver) screen = <ResultPage />;
   else if (inGame) screen = <PlayPage />;
-  else screen = <LobbyPage />;
+  else if (room) screen = <LobbyPage />; // xona lobby (kutish)
+  else screen = <HomePage />; // tab: O'ynash / O'rganish
 
   const inRoom = !!room || inGame || !!gameOver;
 

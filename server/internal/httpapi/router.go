@@ -58,9 +58,12 @@ func Router(d Deps) http.Handler {
 
 	if d.Auth != nil && d.Queries != nil {
 		mh := &meHandler{q: d.Queries, logger: d.Logger}
-		r.Route("/api/me", func(r chi.Router) {
+		sh := &srsHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
+		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth))
-			r.Get("/history", mh.history)
+			r.Get("/api/me/history", mh.history)
+			r.Get("/api/me/srs/due", sh.due)     // 📚 takror kartalar
+			r.Post("/api/srs/review", sh.review) // 📚 baho → SM-2
 		})
 	}
 

@@ -39,6 +39,30 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+async function authGet<T>(path: string, token: string): Promise<T> {
+  const r = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error("so'rov xatosi");
+  return r.json() as Promise<T>;
+}
+
+async function authPost<T>(path: string, body: unknown, token: string): Promise<T> {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error("so'rov xatosi");
+  return r.json() as Promise<T>;
+}
+
+export interface SrsCard {
+  questionId: string;
+  type: string;
+  prompt: string;
+  answer: string;
+  explanation?: string;
+}
+
 export const api = {
   guest: () => post<AuthResp>("/api/auth/guest", {}),
   register: (username: string, email: string, password: string) =>
@@ -47,4 +71,8 @@ export const api = {
     post<AuthResp>("/api/auth/login", { email, password }),
   telegram: (initData: string) => post<AuthResp>("/api/auth/telegram", { initData }),
   subjects: () => get<SubjectInfo[]>("/api/subjects"),
+  srsDue: (subject: string, token: string) =>
+    authGet<SrsCard[]>(`/api/me/srs/due?subject=${encodeURIComponent(subject)}`, token),
+  srsReview: (questionId: string, grade: number, token: string) =>
+    authPost<{ ok: boolean }>("/api/srs/review", { questionId, grade }, token),
 };
