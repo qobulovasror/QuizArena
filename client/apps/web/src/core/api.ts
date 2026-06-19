@@ -51,8 +51,28 @@ async function authPost<T>(path: string, body: unknown, token: string): Promise<
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error("so'rov xatosi");
+  if (!r.ok) {
+    const e = (await r.json().catch(() => ({ error: r.statusText }))) as { error?: string };
+    throw new Error(e.error || "so'rov xatosi");
+  }
   return r.json() as Promise<T>;
+}
+
+async function authDelete(path: string, token: string): Promise<void> {
+  const r = await fetch(path, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error("o'chirib bo'lmadi");
+}
+
+export interface CategoryInfo {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface AdminQuestion {
+  id: string;
+  type: string;
+  prompt: string;
 }
 
 export interface SrsCard {
@@ -99,4 +119,15 @@ export const api = {
     authGet<AssessQuestion[]>(`/api/me/assessment?subject=${encodeURIComponent(subject)}`, token),
   assessSubmit: (answers: AssessAnswer[], token: string) =>
     authPost<{ correct: number; total: number }>("/api/me/assessment/submit", { answers }, token),
+  categories: (subjectId: string) => get<CategoryInfo[]>(`/api/subjects/${subjectId}/categories`),
+  // --- admin ---
+  adminCreateSubject: (body: { slug: string; name: string; icon: string }, token: string) =>
+    authPost<{ id: string }>("/api/admin/subjects", body, token),
+  adminCreateCategory: (body: { subjectId: string; slug: string; name: string }, token: string) =>
+    authPost<{ id: string }>("/api/admin/categories", body, token),
+  adminCreateQuestion: (body: unknown, token: string) =>
+    authPost<{ id: string }>("/api/admin/questions", body, token),
+  adminListQuestions: (categoryId: string, token: string) =>
+    authGet<AdminQuestion[]>(`/api/admin/questions?category=${categoryId}`, token),
+  adminDeleteQuestion: (id: string, token: string) => authDelete(`/api/admin/questions/${id}`, token),
 };

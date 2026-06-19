@@ -32,6 +32,30 @@ func requireAuth(svc *auth.Service) func(http.Handler) http.Handler {
 	}
 }
 
+// requireAdmin — JWT + role=admin tekshiradi (admin marshrutlari).
+func requireAdmin(svc *auth.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tok := bearerToken(r)
+			if tok == "" {
+				writeErr(w, http.StatusUnauthorized, "token kerak")
+				return
+			}
+			claims, err := svc.Verify(tok)
+			if err != nil {
+				writeErr(w, http.StatusUnauthorized, "token yaroqsiz")
+				return
+			}
+			if claims.Role != "admin" {
+				writeErr(w, http.StatusForbidden, "admin huquqi kerak")
+				return
+			}
+			ctx := context.WithValue(r.Context(), userIDKey, claims.Subject)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func userIDFrom(r *http.Request) string {
 	if v, ok := r.Context().Value(userIDKey).(string); ok {
 		return v

@@ -23,6 +23,10 @@ sqlc:
 seed:
 	cd server && go run ./cmd/seed
 
+# Foydalanuvchini admin qilish: make admin EMAIL=ali@example.com
+admin:
+	cd server && go run ./cmd/setadmin -email=$(EMAIL)
+
 # Migratsiya (goose + DATABASE_URL env kerak)
 migrate-up:
 	cd server && goose -dir migrations postgres "$$DATABASE_URL" up

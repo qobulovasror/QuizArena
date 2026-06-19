@@ -69,6 +69,17 @@ func Router(d Deps) http.Handler {
 			r.Post("/api/me/assessment/submit", ah.submit) // 📊 baholash → mastery
 			r.Get("/api/me/mastery", ah.mastery)
 		})
+
+		// Admin (RBAC: role=admin)
+		adm := &adminHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
+		r.Group(func(r chi.Router) {
+			r.Use(requireAdmin(d.Auth))
+			r.Post("/api/admin/subjects", adm.createSubject)
+			r.Post("/api/admin/categories", adm.createCategory)
+			r.Post("/api/admin/questions", adm.createQuestion)
+			r.Get("/api/admin/questions", adm.listQuestions)
+			r.Delete("/api/admin/questions/{id}", adm.deleteQuestion)
+		})
 	}
 
 	return r

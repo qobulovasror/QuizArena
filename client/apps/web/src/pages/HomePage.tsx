@@ -1,19 +1,25 @@
 import { useState } from "react";
+import { useGame } from "../core/store";
 import { LobbyPage } from "./LobbyPage";
 import { PracticePage } from "./PracticePage";
 import { AssessPage } from "./AssessPage";
+import { AdminPage } from "./AdminPage";
 import { cn } from "../lib/cn";
 
-const tabs = [
+type Tab = "compete" | "practice" | "assess" | "admin";
+
+const baseTabs: { id: Tab; label: string }[] = [
   { id: "compete", label: "🏆 O'ynash" },
   { id: "practice", label: "📚 O'rganish" },
   { id: "assess", label: "📊 Baholash" },
-] as const;
-
-type Tab = (typeof tabs)[number]["id"];
+];
 
 export function HomePage() {
+  const isAdmin = useGame((s) => s.user?.role === "admin");
   const [tab, setTab] = useState<Tab>("compete");
+
+  const tabs = isAdmin ? [...baseTabs, { id: "admin" as Tab, label: "🛠 Admin" }] : baseTabs;
+
   return (
     <div>
       <div className="mx-auto max-w-md px-4 pt-4">
@@ -23,7 +29,7 @@ export function HomePage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex-1 rounded-lg py-2 text-sm font-medium transition",
+                "flex-1 rounded-lg py-2 text-xs font-medium transition",
                 tab === t.id ? "bg-white text-indigo-600 shadow" : "text-slate-500",
               )}
             >
@@ -35,6 +41,7 @@ export function HomePage() {
       {tab === "compete" && <LobbyPage />}
       {tab === "practice" && <PracticePage />}
       {tab === "assess" && <AssessPage />}
+      {tab === "admin" && <AdminPage />}
     </div>
   );
 }
