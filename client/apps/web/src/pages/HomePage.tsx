@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { LobbyPage } from "./LobbyPage";
 import { PracticePage } from "./PracticePage";
+import { AssessPage } from "./AssessPage";
 import { cn } from "../lib/cn";
 
 const tabs = [
   { id: "compete", label: "🏆 O'ynash" },
   { id: "practice", label: "📚 O'rganish" },
+  { id: "assess", label: "📊 Baholash" },
 ] as const;
 
+type Tab = (typeof tabs)[number]["id"];
+
 export function HomePage() {
-  const [tab, setTab] = useState<"compete" | "practice">("compete");
+  const [tab, setTab] = useState<Tab>("compete");
   return (
     <div>
       <div className="mx-auto max-w-md px-4 pt-4">
@@ -28,7 +32,9 @@ export function HomePage() {
           ))}
         </div>
       </div>
-      {tab === "compete" ? <LobbyPage /> : <PracticePage />}
+      {tab === "compete" && <LobbyPage />}
+      {tab === "practice" && <PracticePage />}
+      {tab === "assess" && <AssessPage />}
     </div>
   );
 }

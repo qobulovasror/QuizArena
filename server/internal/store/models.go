@@ -95,3 +95,11 @@ type User struct {
 	Role         string    `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+type UserMastery struct {
+	UserID     uuid.UUID `json:"user_id"`
+	CategoryID uuid.UUID `json:"category_id"`
+	Mastery    float64   `json:"mastery"`
+	Attempts   int32     `json:"attempts"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}

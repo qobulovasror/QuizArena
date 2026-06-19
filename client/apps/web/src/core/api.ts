@@ -63,6 +63,25 @@ export interface SrsCard {
   explanation?: string;
 }
 
+export interface MasteryItem {
+  subject: string;
+  category: string;
+  mastery: number;
+  attempts: number;
+}
+
+export interface AssessQuestion {
+  questionId: string;
+  type: string;
+  prompt: string;
+  options?: { id: string; text: string }[];
+}
+
+export interface AssessAnswer {
+  questionId: string;
+  choice: unknown;
+}
+
 export const api = {
   guest: () => post<AuthResp>("/api/auth/guest", {}),
   register: (username: string, email: string, password: string) =>
@@ -75,4 +94,9 @@ export const api = {
     authGet<SrsCard[]>(`/api/me/srs/due?subject=${encodeURIComponent(subject)}`, token),
   srsReview: (questionId: string, grade: number, token: string) =>
     authPost<{ ok: boolean }>("/api/srs/review", { questionId, grade }, token),
+  mastery: (token: string) => authGet<MasteryItem[]>("/api/me/mastery", token),
+  assessQuestions: (subject: string, token: string) =>
+    authGet<AssessQuestion[]>(`/api/me/assessment?subject=${encodeURIComponent(subject)}`, token),
+  assessSubmit: (answers: AssessAnswer[], token: string) =>
+    authPost<{ correct: number; total: number }>("/api/me/assessment/submit", { answers }, token),
 };
