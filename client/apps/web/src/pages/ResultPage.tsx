@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -6,12 +7,13 @@ import { cn } from "../lib/cn";
 const medals = ["🥇", "🥈", "🥉"];
 
 export function ResultPage() {
+  const { t } = useTranslation();
   const { gameOver, selfUserId, newGame } = useGame();
   const board = gameOver?.finalLeaderboard ?? [];
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-4">
-      <h1 className="text-center text-2xl font-bold">O'yin tugadi 🎉</h1>
+      <h1 className="text-center text-2xl font-bold">{t("result.gameOver")}</h1>
       <Card className="space-y-2">
         {board.map((e) => (
           <div
@@ -30,7 +32,7 @@ export function ResultPage() {
         ))}
       </Card>
       <Button className="w-full" onClick={newGame}>
-        Yangi o'yin
+        {t("result.newGame")}
       </Button>
     </div>
   );

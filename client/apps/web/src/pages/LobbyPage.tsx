@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -12,7 +13,10 @@ const fallback = [
   { slug: "general", name: "Umumiy bilim", icon: "🌍" },
 ];
 
+const modeIds = ["classic", "survival"];
+
 export function LobbyPage() {
+  const { t } = useTranslation();
   const { room, selfUserId, createRoom, joinRoom, start, status } = useGame();
   const online = status === "online";
 
@@ -21,15 +25,15 @@ export function LobbyPage() {
     return (
       <div className="mx-auto max-w-md p-4">
         <Card className="space-y-4 text-center">
-          <p className="text-sm text-slate-500">Xona kodi</p>
+          <p className="text-sm text-slate-500">{t("lobby.roomCode")}</p>
           <div className="text-4xl font-bold tracking-widest text-indigo-600">{room.code}</div>
-          <p className="text-xs text-slate-400">Do'stlaringizga kodni ulashing</p>
+          <p className="text-xs text-slate-400">{t("lobby.shareCode")}</p>
           <span className="inline-block rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-600">
-            Rejim: {room.config.mode}
+            {t("lobby.mode", { mode: room.config.mode })}
           </span>
 
           <div className="space-y-1 text-left">
-            <p className="text-sm font-medium">O'yinchilar ({room.players.length})</p>
+            <p className="text-sm font-medium">{t("lobby.players", { count: room.players.length })}</p>
             {room.players.map((p) => (
               <div key={p.userId} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                 <span>
@@ -43,10 +47,10 @@ export function LobbyPage() {
 
           {isHost ? (
             <Button className="w-full" onClick={start} disabled={!online}>
-              O'yinni boshlash
+              {t("lobby.startGame")}
             </Button>
           ) : (
-            <p className="text-sm text-slate-500">Host boshlashini kuting…</p>
+            <p className="text-sm text-slate-500">{t("lobby.waitHost")}</p>
           )}
         </Card>
       </div>
@@ -56,11 +60,6 @@ export function LobbyPage() {
   return <CreateOrJoin onCreate={createRoom} onJoin={joinRoom} />;
 }
 
-const modes = [
-  { id: "classic", name: "Classic", desc: "Hamma javob beradi, tezlik + to'g'rilik" },
-  { id: "survival", name: "Survival", desc: "Xato javob = o'yindan chiqish" },
-];
-
 function CreateOrJoin({
   onCreate,
   onJoin,
@@ -68,6 +67,7 @@ function CreateOrJoin({
   onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number }) => void;
   onJoin: (code: string) => void;
 }) {
+  const { t } = useTranslation();
   const { subjects, loadSubjects, status } = useGame();
   const online = status === "online";
   const [subjectId, setSubjectId] = useState("english");
@@ -84,9 +84,9 @@ function CreateOrJoin({
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-4">
-      <h2 className="text-center text-xl font-semibold">Yangi xona</h2>
+      <h2 className="text-center text-xl font-semibold">{t("lobby.newRoom")}</h2>
       <Card className="space-y-3">
-        <p className="text-sm text-slate-500">Sohani tanlang</p>
+        <p className="text-sm text-slate-500">{t("lobby.pickSubject")}</p>
         <div className="grid grid-cols-3 gap-2">
           {list.map((s) => (
             <button
@@ -104,31 +104,29 @@ function CreateOrJoin({
             </button>
           ))}
         </div>
-        <p className="text-sm text-slate-500">Rejim</p>
+        <p className="text-sm text-slate-500">{t("lobby.modeLabel")}</p>
         <div className="grid grid-cols-2 gap-2">
-          {modes.map((m) => (
+          {modeIds.map((id) => (
             <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
+              key={id}
+              onClick={() => setMode(id)}
               className={cn(
                 "rounded-xl border px-3 py-2 text-left text-sm transition",
-                mode === m.id
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                  : "border-slate-200 hover:bg-slate-50",
+                mode === id ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:bg-slate-50",
               )}
             >
-              <div className="font-medium">{m.name}</div>
-              <div className="text-xs text-slate-400">{m.desc}</div>
+              <div className="font-medium">{t(`lobby.${id}`)}</div>
+              <div className="text-xs text-slate-400">{t(`lobby.${id}Desc`)}</div>
             </button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
-            Savol soni
+            {t("lobby.questionCount")}
             <Input type="number" min={1} max={20} value={count} onChange={(e) => setCount(+e.target.value)} />
           </label>
           <label className="text-sm">
-            Vaqt (soniya)
+            {t("lobby.timeSec")}
             <Input type="number" min={5} max={60} value={time} onChange={(e) => setTime(+e.target.value)} />
           </label>
         </div>
@@ -137,23 +135,23 @@ function CreateOrJoin({
           disabled={!online}
           onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time })}
         >
-          Xona yaratish
+          {t("lobby.createRoom")}
         </Button>
       </Card>
 
-      <div className="text-center text-sm text-slate-400">— yoki —</div>
+      <div className="text-center text-sm text-slate-400">{t("lobby.or")}</div>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">Kod bilan qo'shilish</h2>
+        <h2 className="font-semibold">{t("lobby.joinByCode")}</h2>
         <Input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="Xona kodi"
+          placeholder={t("lobby.joinPlaceholder")}
           maxLength={6}
           className="text-center tracking-widest"
         />
         <Button variant="outline" className="w-full" disabled={code.length < 4 || !online} onClick={() => onJoin(code)}>
-          Qo'shilish
+          {t("lobby.join")}
         </Button>
       </Card>
     </div>

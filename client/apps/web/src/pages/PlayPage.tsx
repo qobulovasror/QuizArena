@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -9,13 +10,14 @@ import type { QuestionShowData, QuestionRevealData } from "../core/protocol";
 type Choice = { optionId?: string; value?: number | boolean };
 
 export function PlayPage() {
+  const { t } = useTranslation();
   const { countdown, question, reveal, answeredIndex, myAnswer, answer, room, selfUserId, eliminated } = useGame();
 
   if (countdown !== null) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
-          <p className="text-slate-500">Boshlanmoqda…</p>
+          <p className="text-slate-500">{t("play.starting")}</p>
           <div className="text-7xl font-bold text-indigo-600">{countdown}</div>
         </div>
       </div>
@@ -23,7 +25,7 @@ export function PlayPage() {
   }
 
   if (!question) {
-    return <div className="flex min-h-[70vh] items-center justify-center text-slate-400">Yuklanmoqda…</div>;
+    return <div className="flex min-h-[70vh] items-center justify-center text-slate-400">{t("common.loading")}</div>;
   }
 
   const revealed = !!reveal && reveal.index === question.index;
@@ -34,14 +36,10 @@ export function PlayPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <div className="text-sm text-slate-500">
-        Savol {question.index + 1} / {question.total}
-      </div>
+      <div className="text-sm text-slate-500">{t("play.question", { n: question.index + 1, total: question.total })}</div>
 
       {eliminated && (
-        <div className="rounded-lg bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-600">
-          Siz o'yindan chiqib ketdingiz — tomoshabin sifatida kuzatyapsiz
-        </div>
+        <div className="rounded-lg bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-600">{t("play.eliminated")}</div>
       )}
 
       {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={timePerQ * 1000} />}
@@ -49,10 +47,10 @@ export function PlayPage() {
       <Card>
         <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>
         <QuestionBody question={question} reveal={revealed ? reveal! : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
-        {answered && !revealed && <p className="mt-4 text-center text-sm text-indigo-600">Javob qabul qilindi ✓</p>}
+        {answered && !revealed && <p className="mt-4 text-center text-sm text-indigo-600">{t("play.accepted")}</p>}
         {revealed && (
           <p className={cn("mt-4 text-center text-sm font-semibold", iWasRight ? "text-green-600" : "text-red-600")}>
-            {myChoice ? (iWasRight ? "To'g'ri! ✓" : "Noto'g'ri ✕") : "Javob bermadingiz"}
+            {myChoice ? (iWasRight ? t("play.correct") : t("play.wrong")) : t("play.noAnswer")}
           </p>
         )}
       </Card>
@@ -88,17 +86,18 @@ function QuestionBody({
   disabled: boolean;
   onAnswer: (choice: Choice) => void;
 }) {
+  const { t } = useTranslation();
   const correct = (reveal?.correct ?? {}) as Choice;
 
   if (question.type === "true_false") {
     return (
       <div className="grid grid-cols-2 gap-3">
         {[
-          { label: "To'g'ri ✓", val: true },
-          { label: "Noto'g'ri ✕", val: false },
+          { key: "play.tfTrue", val: true },
+          { key: "play.tfFalse", val: false },
         ].map((b) => (
           <button
-            key={b.label}
+            key={b.key}
             disabled={disabled}
             onClick={() => onAnswer({ value: b.val })}
             className={cn(
@@ -108,7 +107,7 @@ function QuestionBody({
               !reveal && "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50",
             )}
           >
-            {b.label}
+            {t(b.key)}
           </button>
         ))}
       </div>
@@ -156,6 +155,7 @@ function NumericBody({
   disabled: boolean;
   onAnswer: (choice: Choice) => void;
 }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState("");
   const correct = (reveal?.correct ?? {}) as { value?: number };
   return (
@@ -165,14 +165,14 @@ function NumericBody({
         value={reveal && myChoice ? String(myChoice.value) : val}
         disabled={disabled}
         onChange={(e) => setVal(e.target.value)}
-        placeholder="Javobni kiriting"
+        placeholder={t("play.enterAnswer")}
         className="text-center text-lg"
       />
       {reveal ? (
-        <p className="text-center text-sm text-green-700">To'g'ri javob: {correct.value}</p>
+        <p className="text-center text-sm text-green-700">{t("play.correctAnswer", { val: correct.value })}</p>
       ) : (
         <Button className="w-full" disabled={disabled || val === ""} onClick={() => onAnswer({ value: Number(val) })}>
-          Javob berish
+          {t("play.submitAnswer")}
         </Button>
       )}
     </div>

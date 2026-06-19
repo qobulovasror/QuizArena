@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { api } from "../core/api";
 import { Button } from "../components/ui/button";
@@ -8,6 +9,7 @@ import { Card } from "../components/ui/card";
 type Mode = "guest" | "login" | "register";
 
 export function AuthPage() {
+  const { t } = useTranslation();
   const { displayName, setDisplayName, setAuth, connect } = useGame();
   const [mode, setMode] = useState<Mode>("guest");
   const [email, setEmail] = useState("");
@@ -33,15 +35,15 @@ export function AuthPage() {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center p-4">
       <h1 className="mb-1 text-center text-3xl font-bold text-indigo-600">QuizArena</h1>
-      <p className="mb-6 text-center text-sm text-slate-500">Real-time bilim musobaqasi</p>
+      <p className="mb-6 text-center text-sm text-slate-500">{t("auth.tagline")}</p>
 
       <Card className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">Ismingiz (o'yinda)</label>
+          <label className="mb-1 block text-sm font-medium">{t("auth.nameLabel")}</label>
           <Input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Masalan: Ali"
+            placeholder={t("auth.namePlaceholder")}
           />
         </div>
 
@@ -55,13 +57,13 @@ export function AuthPage() {
                 (mode === m ? "bg-indigo-100 text-indigo-700" : "text-slate-500 hover:bg-slate-100")
               }
             >
-              {m === "guest" ? "Mehmon" : m === "login" ? "Kirish" : "Ro'yxat"}
+              {t(`auth.${m}`)}
             </button>
           ))}
         </div>
 
         {mode === "register" && (
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("auth.username")} />
         )}
         {mode !== "guest" && (
           <>
@@ -69,13 +71,13 @@ export function AuthPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
+              placeholder={t("auth.email")}
             />
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Parol"
+              placeholder={t("auth.password")}
             />
           </>
         )}
@@ -91,7 +93,7 @@ export function AuthPage() {
             else go(() => api.register(username, email, password));
           }}
         >
-          {busy ? "..." : mode === "guest" ? "Mehmon sifatida o'ynash" : mode === "login" ? "Kirish" : "Ro'yxatdan o'tish"}
+          {busy ? "..." : mode === "guest" ? t("auth.guestBtn") : mode === "login" ? t("auth.loginBtn") : t("auth.registerBtn")}
         </Button>
       </Card>
     </div>

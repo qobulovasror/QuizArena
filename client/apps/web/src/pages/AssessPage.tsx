@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { api } from "../core/api";
 import type { MasteryItem, AssessQuestion, AssessAnswer } from "../core/api";
@@ -10,6 +11,7 @@ import { cn } from "../lib/cn";
 type View = "overview" | "quiz" | "result";
 
 export function AssessPage() {
+  const { t } = useTranslation();
   const token = useGame((s) => s.token);
   const subjects = useGame((s) => s.subjects);
   const loadSubjects = useGame((s) => s.loadSubjects);
@@ -74,9 +76,7 @@ export function AssessPage() {
     const q = questions[idx];
     return (
       <div className="mx-auto max-w-md space-y-4 p-4">
-        <p className="text-center text-xs text-slate-400">
-          Test: {idx + 1} / {questions.length}
-        </p>
+        <p className="text-center text-xs text-slate-400">{t("assess.testProgress", { n: idx + 1, total: questions.length })}</p>
         <Card>
           <h2 className="mb-5 text-center text-xl font-semibold">{q.prompt}</h2>
           <AnswerInput q={q} onAnswer={answer} />
@@ -90,13 +90,13 @@ export function AssessPage() {
     return (
       <div className="mx-auto max-w-md space-y-4 p-4">
         <Card className="space-y-3 text-center">
-          <h2 className="text-2xl font-bold">Natija</h2>
+          <h2 className="text-2xl font-bold">{t("assess.result")}</h2>
           <div className="text-4xl font-bold text-indigo-600">
             {score.correct} / {score.total}
           </div>
-          <p className="text-sm text-slate-500">{pct}% to'g'ri · daraja yangilandi</p>
+          <p className="text-sm text-slate-500">{t("assess.percentCorrect", { pct })}</p>
           <Button className="w-full" onClick={() => setView("overview")}>
-            Qaytish
+            {t("assess.back")}
           </Button>
         </Card>
       </div>
@@ -106,9 +106,9 @@ export function AssessPage() {
   return (
     <div className="mx-auto max-w-md space-y-4 p-4">
       <Card className="space-y-3">
-        <h2 className="font-semibold">Bilim darajangiz</h2>
+        <h2 className="font-semibold">{t("assess.yourLevel")}</h2>
         {items.length === 0 ? (
-          <p className="text-sm text-slate-400">Hali test topshirmagansiz. Quyida test boshlang.</p>
+          <p className="text-sm text-slate-400">{t("assess.noTests")}</p>
         ) : (
           items.map((m) => (
             <div key={m.subject + m.category} className="space-y-1">
@@ -130,7 +130,7 @@ export function AssessPage() {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">Test topshirish</h2>
+        <h2 className="font-semibold">{t("assess.takeTest")}</h2>
         <div className="flex flex-wrap gap-2">
           {list.map((s) => (
             <button
@@ -146,7 +146,7 @@ export function AssessPage() {
           ))}
         </div>
         <Button className="w-full" onClick={start}>
-          Boshlash (5 savol)
+          {t("assess.start")}
         </Button>
       </Card>
     </div>
