@@ -11,11 +11,14 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math/rand"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/azizbek12234/quizarena/server/internal/config"
+	"github.com/azizbek12234/quizarena/server/internal/game/providers"
+	"github.com/azizbek12234/quizarena/server/internal/state"
 	"github.com/azizbek12234/quizarena/server/internal/store"
 )
 
@@ -31,17 +34,62 @@ func main() {
 	defer pool.Close()
 	q = store.New(pool)
 
+	// english — generativ provider'dan DB bankka (SRS/Baholash uchun)
 	eng := ensureSubject("english", "Ingliz tili", "📘")
-	ensureCategory(eng.ID, "irregular-verbs", "Noto'g'ri fe'llar")
+	engCat := ensureCategory(eng.ID, "irregular-verbs", "Noto'g'ri fe'llar")
+	if ev, err := providers.NewEnglishVerb(); err == nil {
+		qs, _ := ev.Questions(60)
+		seedProvider(engCat.ID, qs)
+	}
 
+	// math — generativ provider'dan DB bankka
 	math := ensureSubject("math", "Matematika", "🔢")
-	ensureCategory(math.ID, "arithmetic", "Arifmetika")
+	mathCat := ensureCategory(math.ID, "arithmetic", "Arifmetika")
+	mqs, _ := providers.NewMath().Questions(50)
+	seedProvider(mathCat.ID, mqs)
 
 	gen := ensureSubject("general", "Umumiy bilim", "🌍")
 	gcat := ensureCategory(gen.ID, "mixed", "Aralash")
 	seedGeneral(gcat.ID)
 
 	log.Println("seed tugadi ✓")
+}
+
+// seedProvider — generativ provider savollarini DB'ga yozadi (idempotent, takrorsiz prompt).
+// Variantlar tartibi aralashtiriladi (to'g'ri javob doim birinchi turmasligi uchun).
+func seedProvider(categoryID uuid.UUID, qs []state.Question) {
+	n, err := q.CountQuestionsByCategory(ctx, categoryID)
+	if err != nil {
+		log.Fatalf("savol soni: %v", err)
+	}
+	if n > 0 {
+		log.Printf("• savollar mavjud (%d)", n)
+		return
+	}
+	seen := map[string]bool{}
+	count := 0
+	for _, item := range qs {
+		if seen[item.Prompt] {
+			continue
+		}
+		seen[item.Prompt] = true
+
+		var optsJSON []byte
+		if len(item.Options) > 0 {
+			opts := append([]state.Option(nil), item.Options...)
+			rand.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
+			optsJSON, _ = json.Marshal(opts)
+		}
+		e := item.Explanation
+		if _, err := q.CreateQuestion(ctx, store.CreateQuestionParams{
+			CategoryID: categoryID, Type: item.Type, Prompt: item.Prompt,
+			Options: optsJSON, Correct: item.Correct, Explanation: &e, Difficulty: 1,
+		}); err != nil {
+			log.Fatalf("savol yozish: %v", err)
+		}
+		count++
+	}
+	log.Printf("✓ %d savol seed qilindi", count)
 }
 
 func ensureSubject(slug, name, icon string) store.Subject {
