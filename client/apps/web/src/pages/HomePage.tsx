@@ -6,15 +6,17 @@ import { PracticePage } from "./PracticePage";
 import { AssessPage } from "./AssessPage";
 import { AdminPage } from "./AdminPage";
 import { RatingPage } from "./RatingPage";
+import { TournamentsPage } from "./TournamentsPage";
 import { cn } from "../lib/cn";
 
-type Tab = "compete" | "practice" | "assess" | "rating" | "admin";
+type Tab = "compete" | "practice" | "assess" | "rating" | "tournament" | "admin";
 
 const baseTabs: { id: Tab; key: string }[] = [
   { id: "compete", key: "home.compete" },
   { id: "practice", key: "home.practice" },
   { id: "assess", key: "home.assess" },
   { id: "rating", key: "home.rating" },
+  { id: "tournament", key: "home.tournament" },
 ];
 
 export function HomePage() {
@@ -27,7 +29,7 @@ export function HomePage() {
   return (
     <div>
       <div className="mx-auto max-w-md px-4 pt-4">
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {tabs.map((tabItem) => (
             <button
               key={tabItem.id}
@@ -46,6 +48,7 @@ export function HomePage() {
       {tab === "practice" && <PracticePage />}
       {tab === "assess" && <AssessPage />}
       {tab === "rating" && <RatingPage />}
+      {tab === "tournament" && <TournamentsPage />}
       {tab === "admin" && <AdminPage />}
     </div>
   );

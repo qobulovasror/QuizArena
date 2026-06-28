@@ -116,6 +116,31 @@ export interface LeaderboardRow {
   correct: number;
 }
 
+export type TournamentStatus = "upcoming" | "active" | "finished";
+
+export interface TournamentInfo {
+  id: string;
+  title: string;
+  subject: string;
+  subjectName: string;
+  questionCount: number;
+  startsAt: string;
+  endsAt: string;
+  status: TournamentStatus;
+}
+
+export interface TournamentQ {
+  questionId: string;
+  type: string;
+  prompt: string;
+  options?: { id: string; text: string }[];
+}
+
+export interface TournamentLeaderRow {
+  username: string;
+  score: number;
+}
+
 export const api = {
   guest: () => post<AuthResp>("/api/auth/guest", {}),
   register: (username: string, email: string, password: string) =>
@@ -137,6 +162,13 @@ export const api = {
   // --- reyting ---
   globalLeaderboard: () => get<LeaderboardRow[]>("/api/leaderboard/global"),
   myRating: (token: string) => authGet<RatingItem[]>("/api/me/rating", token),
+  // --- turnirlar ---
+  tournaments: (token: string) => authGet<TournamentInfo[]>("/api/tournaments", token),
+  tournamentPlay: (id: string, token: string) => authGet<TournamentQ[]>(`/api/tournaments/${id}/play`, token),
+  tournamentSubmit: (id: string, answers: AssessAnswer[], token: string) =>
+    authPost<{ correct: number; total: number }>(`/api/tournaments/${id}/submit`, { answers }, token),
+  tournamentLeaderboard: (id: string, token: string) =>
+    authGet<TournamentLeaderRow[]>(`/api/tournaments/${id}/leaderboard`, token),
   // --- admin ---
   adminCreateSubject: (body: { slug: string; name: string; icon: string }, token: string) =>
     authPost<{ id: string }>("/api/admin/subjects", body, token),
@@ -147,4 +179,8 @@ export const api = {
   adminListQuestions: (categoryId: string, token: string) =>
     authGet<AdminQuestion[]>(`/api/admin/questions?category=${categoryId}`, token),
   adminDeleteQuestion: (id: string, token: string) => authDelete(`/api/admin/questions/${id}`, token),
+  adminCreateTournament: (
+    body: { title: string; subjectSlug: string; questionCount: number; startsAt: string; endsAt: string },
+    token: string,
+  ) => authPost<{ id: string }>("/api/admin/tournaments", body, token),
 };

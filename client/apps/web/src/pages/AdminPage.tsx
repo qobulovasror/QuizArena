@@ -45,13 +45,22 @@ export function AdminPage() {
   // yangi kategoriya
   const [newCat, setNewCat] = useState("");
 
+  // turnir formi
+  const [tnTitle, setTnTitle] = useState("");
+  const [tnSubject, setTnSubject] = useState("");
+  const [tnCount, setTnCount] = useState("5");
+  const [tnStart, setTnStart] = useState("");
+  const [tnEnd, setTnEnd] = useState("");
+  const [tnMsg, setTnMsg] = useState("");
+
   useEffect(() => {
     loadSubjects();
   }, [loadSubjects]);
 
   useEffect(() => {
     if (subjects.length && !subjectId) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (subjects.length && !tnSubject) setTnSubject(subjects[0].slug);
+  }, [subjects, subjectId, tnSubject]);
 
   const loadCats = useCallback(async () => {
     if (!subjectId) return;
@@ -133,6 +142,29 @@ export function AdminPage() {
       setMsg(e instanceof Error ? e.message : "xato");
       setTimeout(() => setMsg(""), 2500);
     }
+  }
+
+  async function addTournament() {
+    if (!tnTitle || !tnSubject || !tnStart || !tnEnd) return;
+    try {
+      await api.adminCreateTournament(
+        {
+          title: tnTitle,
+          subjectSlug: tnSubject,
+          questionCount: Number(tnCount),
+          startsAt: new Date(tnStart).toISOString(),
+          endsAt: new Date(tnEnd).toISOString(),
+        },
+        token,
+      );
+      setTnMsg("✓ turnir yaratildi");
+      setTnTitle("");
+      setTnStart("");
+      setTnEnd("");
+    } catch (e) {
+      setTnMsg(e instanceof Error ? e.message : "xato");
+    }
+    setTimeout(() => setTnMsg(""), 2500);
   }
 
   return (
@@ -243,6 +275,34 @@ export function AdminPage() {
           </div>
         ))}
         {questions.length === 0 && <p className="text-sm text-slate-400">Savol yo'q.</p>}
+      </Card>
+
+      <Card className="space-y-3">
+        <h3 className="font-medium">🏆 Yangi turnir</h3>
+        <Input value={tnTitle} onChange={(e) => setTnTitle(e.target.value)} placeholder="Turnir nomi" />
+        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={tnSubject} onChange={(e) => setTnSubject(e.target.value)}>
+          {subjects.map((s) => (
+            <option key={s.id} value={s.slug}>
+              {s.icon} {s.name}
+            </option>
+          ))}
+        </select>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Savol soni</label>
+          <Input type="number" value={tnCount} onChange={(e) => setTnCount(e.target.value)} placeholder="Savol soni" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Boshlanish</label>
+          <Input type="datetime-local" value={tnStart} onChange={(e) => setTnStart(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Tugash</label>
+          <Input type="datetime-local" value={tnEnd} onChange={(e) => setTnEnd(e.target.value)} />
+        </div>
+        <Button className="w-full" onClick={addTournament} disabled={!tnTitle || !tnSubject || !tnStart || !tnEnd}>
+          Turnir yaratish
+        </Button>
+        {tnMsg && <p className="text-center text-sm text-indigo-600">{tnMsg}</p>}
       </Card>
     </div>
   );
