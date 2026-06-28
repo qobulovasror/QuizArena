@@ -495,9 +495,16 @@ func (e *Engine) showPayload(q *state.LiveQuestion, idx, total int, deadline int
 	for i, o := range q.Options {
 		opts[i] = ws.Option{ID: o.ID, Text: o.Text} // Correct YO'Q
 	}
+	var targets []ws.Option
+	if len(q.Targets) > 0 {
+		targets = make([]ws.Option, len(q.Targets))
+		for i, tg := range q.Targets {
+			targets[i] = ws.Option{ID: tg.ID, Text: tg.Text}
+		}
+	}
 	return ws.QuestionShowData{
 		Index: idx, Total: total, Type: q.Type, Prompt: q.Prompt,
-		Options: opts, DeadlineTs: deadline,
+		Options: opts, Targets: targets, DeadlineTs: deadline,
 	}
 }
 
@@ -614,6 +621,11 @@ func buildLive(qs []state.Question) []*state.LiveQuestion {
 		opts := append([]state.Option(nil), q.Options...)
 		rand.Shuffle(len(opts), func(a, b int) { opts[a], opts[b] = opts[b], opts[a] })
 		q.Options = opts
+		if len(q.Targets) > 0 { // match/categorize: o'ng tomon/toifalarni ham aralashtiramiz
+			tg := append([]state.Option(nil), q.Targets...)
+			rand.Shuffle(len(tg), func(a, b int) { tg[a], tg[b] = tg[b], tg[a] })
+			q.Targets = tg
+		}
 		live[i] = &state.LiveQuestion{Question: q, Answered: make(map[string]bool)}
 	}
 	return live

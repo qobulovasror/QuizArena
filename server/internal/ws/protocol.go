@@ -137,7 +137,8 @@ type QuestionShowData struct {
 	Type       string   `json:"type"`
 	Prompt     string   `json:"prompt"`
 	Options    []Option `json:"options,omitempty"`
-	DeadlineTs int64    `json:"deadlineTs"` // server epoch ms
+	Targets    []Option `json:"targets,omitempty"` // match(o'ng)/categorize(toifa)
+	DeadlineTs int64    `json:"deadlineTs"`        // server epoch ms
 }
 
 type AnswerAckData struct {

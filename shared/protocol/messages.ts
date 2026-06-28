@@ -134,6 +134,7 @@ export interface QuestionShowData {
   type: string; // §5 katalog turi
   prompt: string;
   options?: Option[];
+  targets?: Option[]; // match(o'ng)/categorize(toifa)
   deadlineTs: number; // server epoch ms
 }
 export interface AnswerAckData {

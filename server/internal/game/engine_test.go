@@ -218,6 +218,24 @@ func TestTeamStandings(t *testing.T) {
 	}
 }
 
+// match/categorize: targets (o'ng tomon/toifalar) question:show payload'iga kiradi.
+func TestShowPayloadTargets(t *testing.T) {
+	e, _ := newTestEngine()
+	q := &state.LiveQuestion{Question: state.Question{
+		Type:    "match",
+		Prompt:  "moslang",
+		Options: []state.Option{{ID: "l1", Text: "cat"}},
+		Targets: []state.Option{{ID: "r1", Text: "mushuk"}},
+	}}
+	p := e.showPayload(q, 0, 1, 123)
+	if len(p.Targets) != 1 || p.Targets[0].ID != "r1" {
+		t.Fatalf("targets showPayload'da kutilgan: %+v", p.Targets)
+	}
+	if len(p.Options) != 1 || p.Options[0].ID != "l1" {
+		t.Fatalf("options showPayload'da kutilgan: %+v", p.Options)
+	}
+}
+
 // "english" sohasida EnglishVerbProvider'dan haqiqiy savol keladi.
 func TestEnglishGameQuestion(t *testing.T) {
 	e, _ := newTestEngine()

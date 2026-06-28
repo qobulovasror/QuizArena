@@ -92,6 +92,12 @@ oshkor bo'lmaydi. Javob va to'g'ri javob shakli (1-bosqich `mcq` uchun):
 > `match`/`categorize` — to'la moslik (har juft/element to'g'ri); `ordering` — aniq tartib;
 > `cloze` — har bo'shliq mos `accepted` ro'yxatida (normalize: trim + lowercase).
 > Boshqa turlar (§5 katalog) keyingi bosqichlarda shu jadvalga qo'shiladi.
+
+**Render uchun qo'shimcha (`question:show`):**
+- `match` — `options` = chap ustun (juftlanadigan), **`targets`** = o'ng ustun (variantlar). Ikkalasi opaque `id`, server aralashtiradi.
+- `categorize` — `options` = elementlar, **`targets`** = toifalar.
+- `ordering` — `options` = aralashtirilgan elementlar; client qayta tartiblaydi, javobda `order` id ketma-ketligi.
+- `cloze` — `options` yo'q; `prompt` ichida har bo'shliq **`___`** (3 ta pastki chiziq) bilan belgilanadi; client shu markerlar sonicha kiritish maydoni chizadi.
 > Server `choice` ni **xom** (`json.RawMessage`/`unknown`) qabul qiladi va tur strategiyasi
 > orqali tekshiradi.
 

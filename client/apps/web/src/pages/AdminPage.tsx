@@ -8,6 +8,19 @@ import { Card } from "../components/ui/card";
 
 const OPT_IDS = ["a", "b", "c", "d"];
 
+const QTYPES = ["mcq", "true_false", "numeric", "ordering", "cloze", "match", "categorize"];
+const BULK_TYPES = ["ordering", "cloze", "match", "categorize"];
+
+// bo'sh bo'lmagan, trim qilingan qatorlar
+const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+
+const bulkHint: Record<string, string> = {
+  ordering: "Elementlar TO'G'RI tartibda, har biri yangi qatorda.",
+  cloze: "Savol matniga ___ qo'ying. Bu yerga har bo'shliq javobi (sinonim = vergul), yangi qatorda.",
+  match: "Har qatorda: chap = o'ng (masalan: cat = mushuk).",
+  categorize: "Har qatorda: element = Toifa (masalan: olma = Meva).",
+};
+
 export function AdminPage() {
   const token = useGame((s) => s.token)!;
   const subjects = useGame((s) => s.subjects);
@@ -26,6 +39,7 @@ export function AdminPage() {
   const [correctIdx, setCorrectIdx] = useState(0);
   const [tfValue, setTfValue] = useState(true);
   const [numValue, setNumValue] = useState("");
+  const [bulk, setBulk] = useState(""); // ordering/cloze/match/categorize uchun matn kiritish
   const [expl, setExpl] = useState("");
 
   // yangi kategoriya
@@ -76,6 +90,23 @@ export function AdminPage() {
       body.correct = { value: tfValue };
     } else if (type === "numeric") {
       body.correct = { value: Number(numValue), tolerance: 0 };
+    } else if (type === "ordering") {
+      const items = lines(bulk);
+      body.options = items.map((tx, i) => ({ id: `o${i + 1}`, text: tx }));
+      body.correct = { order: items.map((_, i) => `o${i + 1}`) };
+    } else if (type === "cloze") {
+      body.correct = { blanks: lines(bulk).map((l) => ({ accepted: l.split(",").map((x) => x.trim()).filter(Boolean) })) };
+    } else if (type === "match") {
+      const rows = lines(bulk).map((l) => l.split("="));
+      body.options = rows.map((r, i) => ({ id: `l${i + 1}`, text: (r[0] ?? "").trim() }));
+      body.targets = rows.map((r, i) => ({ id: `r${i + 1}`, text: (r[1] ?? "").trim() }));
+      body.correct = { pairs: Object.fromEntries(rows.map((_, i) => [`l${i + 1}`, `r${i + 1}`])) };
+    } else if (type === "categorize") {
+      const rows = lines(bulk).map((l) => l.split("="));
+      const catNames = [...new Set(rows.map((r) => (r[1] ?? "").trim()))];
+      body.options = rows.map((r, i) => ({ id: `i${i + 1}`, text: (r[0] ?? "").trim() }));
+      body.targets = catNames.map((n, i) => ({ id: `c${i + 1}`, text: n }));
+      body.correct = { assign: Object.fromEntries(rows.map((r, i) => [`i${i + 1}`, `c${catNames.indexOf((r[1] ?? "").trim()) + 1}`])) };
     }
     try {
       await api.adminCreateQuestion(body, token);
@@ -83,6 +114,7 @@ export function AdminPage() {
       setPrompt("");
       setOpts(["", "", "", ""]);
       setNumValue("");
+      setBulk("");
       setExpl("");
       loadQuestions();
     } catch (e) {
@@ -130,12 +162,12 @@ export function AdminPage() {
 
       <Card className="space-y-3">
         <h3 className="font-medium">Yangi savol</h3>
-        <div className="flex gap-2 text-sm">
-          {["mcq", "true_false", "numeric"].map((t) => (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {QTYPES.map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={"flex-1 rounded-lg py-1.5 " + (type === t ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500")}
+              className={"rounded-lg px-2.5 py-1.5 " + (type === t ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500")}
             >
               {t}
             </button>
@@ -162,8 +194,21 @@ export function AdminPage() {
         )}
         {type === "numeric" && <Input type="number" value={numValue} onChange={(e) => setNumValue(e.target.value)} placeholder="To'g'ri javob (raqam)" />}
 
+        {BULK_TYPES.includes(type) && (
+          <div className="space-y-1">
+            <textarea
+              value={bulk}
+              onChange={(e) => setBulk(e.target.value)}
+              rows={4}
+              placeholder={bulkHint[type]}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-slate-400">{bulkHint[type]}</p>
+          </div>
+        )}
+
         <Input value={expl} onChange={(e) => setExpl(e.target.value)} placeholder="Izoh (ixtiyoriy)" />
-        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt}>
+        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt || (BULK_TYPES.includes(type) && !bulk.trim())}>
           Qo'shish
         </Button>
         {msg && <p className="text-center text-sm text-indigo-600">{msg}</p>}

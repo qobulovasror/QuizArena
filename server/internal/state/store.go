@@ -33,7 +33,8 @@ type Question struct {
 	Type        string
 	Prompt      string
 	Explanation string
-	Options     []Option        // mcq/multi_select uchun (true_false/numeric uchun bo'sh)
+	Options     []Option        // mcq/multi_select/ordering/match(chap)/categorize(element)
+	Targets     []Option        // match(o'ng) / categorize(toifa) — aks holda bo'sh
 	Correct     json.RawMessage // masalan {"optionId":"o2"} | {"value":12,"tolerance":0.5}
 }
 

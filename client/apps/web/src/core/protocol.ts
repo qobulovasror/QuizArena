@@ -73,6 +73,7 @@ export interface QuestionShowData {
   type: string;
   prompt: string;
   options?: Option[];
+  targets?: Option[]; // match(o'ng)/categorize(toifa)
   deadlineTs: number;
 }
 

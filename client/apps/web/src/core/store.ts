@@ -42,9 +42,21 @@ interface CreateOpts {
   timePerQ: number;
 }
 
+// Javob shakli savol turiga bog'liq (README §6) — barcha maydonlar ixtiyoriy.
+export type AnswerChoice = {
+  optionId?: string;
+  optionIds?: string[];
+  value?: number | boolean;
+  text?: string;
+  pairs?: Record<string, string>;     // match
+  assign?: Record<string, string>;    // categorize
+  order?: string[];                   // ordering
+  blanks?: string[];                  // cloze
+};
+
 interface MyAnswer {
   index: number;
-  choice: { optionId?: string; value?: number | boolean };
+  choice: AnswerChoice;
 }
 
 interface GameStore {
