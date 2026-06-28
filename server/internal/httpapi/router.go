@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,14 +34,18 @@ func Router(d Deps) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(cors)
+	r.Use(requestLogger(d.Logger))
+	r.Use(secureHeaders)
+	r.Use(corsMiddleware(d.Cfg.CORSOrigins))
 
 	r.Get("/healthz", health)
 	r.Get("/ws", ws.Handle(d.Hub, d.WSRouter, wsAuth(d.Auth), d.Logger))
 
 	if d.Auth != nil {
 		ah := &authHandler{svc: d.Auth, validate: validator.New(), logger: d.Logger}
+		authLimiter := newRateLimiter(30, time.Minute) // brute-force himoyasi (IP/daqiqa)
 		r.Route("/api/auth", func(r chi.Router) {
+			r.Use(authLimiter.middleware)
 			r.Post("/guest", ah.guest)
 			r.Post("/register", ah.register)
 			r.Post("/login", ah.login)
@@ -109,18 +114,4 @@ func wsAuth(svc *auth.Service) ws.AuthFunc {
 func health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
-}
-
-// cors — DEV uchun ochiq CORS. PROD'da origin ro'yxati bilan cheklanadi.
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
