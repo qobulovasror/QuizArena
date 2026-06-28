@@ -125,9 +125,14 @@ export function AdminPage() {
 
   async function addCategory() {
     if (!subjectId || !newCat) return;
-    await api.adminCreateCategory({ subjectId, slug: newCat.toLowerCase().replace(/\s+/g, "-"), name: newCat }, token).catch(() => {});
-    setNewCat("");
-    loadCats();
+    try {
+      await api.adminCreateCategory({ subjectId, slug: newCat.toLowerCase().replace(/\s+/g, "-"), name: newCat }, token);
+      setNewCat("");
+      loadCats();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "xato");
+      setTimeout(() => setMsg(""), 2500);
+    }
   }
 
   return (
@@ -223,8 +228,13 @@ export function AdminPage() {
             </span>
             <button
               onClick={async () => {
-                await api.adminDeleteQuestion(q.id, token).catch(() => {});
-                loadQuestions();
+                try {
+                  await api.adminDeleteQuestion(q.id, token);
+                  loadQuestions();
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "xato");
+                  setTimeout(() => setMsg(""), 2500);
+                }
               }}
               className="shrink-0 text-red-500 hover:text-red-700"
             >

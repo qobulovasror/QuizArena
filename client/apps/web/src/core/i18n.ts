@@ -67,6 +67,7 @@ const uz = {
       enterAnswer: "Javobni kiriting",
       submitAnswer: "Javob berish",
       correctAnswer: "To'g'ri javob: {{val}}",
+      correctLabel: "To'g'ri javob:",
       eliminated: "Siz o'yindan chiqib ketdingiz — tomoshabin sifatida kuzatyapsiz",
     },
     result: { gameOver: "O'yin tugadi 🎉", newGame: "Yangi o'yin", teams: "Jamoa natijasi", team: "Jamoa {{team}}" },
@@ -91,6 +92,7 @@ const uz = {
     assess: {
       yourLevel: "Bilim darajangiz",
       noTests: "Hali test topshirmagansiz. Quyida test boshlang.",
+      noQuestions: "Bu sohada test savollari yo'q (DB bank kerak).",
       takeTest: "Test topshirish",
       start: "Boshlash (5 savol)",
       testProgress: "Test: {{n}} / {{total}}",
@@ -173,6 +175,7 @@ const en = {
       enterAnswer: "Enter your answer",
       submitAnswer: "Submit",
       correctAnswer: "Correct answer: {{val}}",
+      correctLabel: "Correct answer:",
       eliminated: "You're eliminated — watching as a spectator",
     },
     result: { gameOver: "Game over 🎉", newGame: "New game", teams: "Team results", team: "Team {{team}}" },
@@ -197,6 +200,7 @@ const en = {
     assess: {
       yourLevel: "Your level",
       noTests: "You haven't taken any tests yet. Start one below.",
+      noQuestions: "No test questions for this subject (DB bank needed).",
       takeTest: "Take a test",
       start: "Start (5 questions)",
       testProgress: "Test: {{n}} / {{total}}",

@@ -36,7 +36,7 @@ export function PlayPage() {
   const totalMs =
     (room?.config.mode === "time_attack" ? timePerQ * (room?.config.questionCount ?? 1) : timePerQ) * 1000;
   const myChoice: Choice | undefined = myAnswer?.index === question.index ? myAnswer.choice : undefined;
-  const iWasRight = revealed ? isMine(question.type, myChoice, reveal!.correct) : false;
+  const iWasRight = revealed && reveal ? isMine(question.type, myChoice, reveal.correct) : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
@@ -50,7 +50,7 @@ export function PlayPage() {
 
       <Card>
         {question.type !== "cloze" && <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>}
-        <QuestionBody key={question.index} question={question} reveal={revealed ? reveal! : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
+        <QuestionBody key={question.index} question={question} reveal={revealed && reveal ? reveal : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
         {answered && !revealed && <p className="mt-4 text-center text-sm text-indigo-600">{t("play.accepted")}</p>}
         {revealed && (
           <p className={cn("mt-4 text-center text-sm font-semibold", iWasRight ? "text-green-600" : "text-red-600")}>
@@ -59,10 +59,13 @@ export function PlayPage() {
         )}
       </Card>
 
-      {revealed && (
+      {revealed && reveal && (
         <Card className="space-y-2">
-          {reveal!.explanation && <p className="text-sm text-slate-600">{reveal!.explanation}</p>}
-          <Leaderboard entries={reveal!.leaderboard} selfId={selfUserId} />
+          {["ordering", "cloze", "match", "categorize"].includes(question.type) && (
+            <CorrectAnswer question={question} correct={reveal.correct} />
+          )}
+          {reveal.explanation && <p className="text-sm text-slate-600">{reveal.explanation}</p>}
+          <Leaderboard entries={reveal.leaderboard} selfId={selfUserId} />
         </Card>
       )}
     </div>
@@ -110,6 +113,42 @@ function isMine(type: string, mine: Choice | undefined, correct: unknown): boole
     default:
       return mine.optionId === c.optionId;
   }
+}
+
+// CorrectAnswer — ordering/cloze/match/categorize uchun to'g'ri javobni matn ko'rinishida ko'rsatadi.
+function CorrectAnswer({ question, correct }: { question: QuestionShowData; correct: unknown }) {
+  const { t } = useTranslation();
+  const c = (correct ?? {}) as {
+    order?: string[];
+    pairs?: Record<string, string>;
+    assign?: Record<string, string>;
+    blanks?: { accepted: string[] }[];
+  };
+  const optText = (id: string) => question.options?.find((o) => o.id === id)?.text ?? id;
+  const tgtText = (id: string) => question.targets?.find((o) => o.id === id)?.text ?? id;
+
+  let rows: string[] = [];
+  if (question.type === "ordering" && c.order) {
+    rows = c.order.map((id, i) => `${i + 1}. ${optText(id)}`);
+  } else if (question.type === "cloze" && c.blanks) {
+    rows = c.blanks.map((b, i) => `${i + 1}. ${b.accepted.join(" / ")}`);
+  } else if (question.type === "match" && c.pairs) {
+    rows = Object.entries(c.pairs).map(([l, r]) => `${optText(l)} → ${tgtText(r)}`);
+  } else if (question.type === "categorize" && c.assign) {
+    rows = Object.entries(c.assign).map(([item, cat]) => `${optText(item)} → ${tgtText(cat)}`);
+  }
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="rounded-xl bg-green-50 px-4 py-3">
+      <p className="mb-1 text-sm font-semibold text-green-700">{t("play.correctLabel")}</p>
+      <ul className="space-y-0.5 text-sm text-slate-700">
+        {rows.map((r, i) => (
+          <li key={i}>{r}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function QuestionBody({

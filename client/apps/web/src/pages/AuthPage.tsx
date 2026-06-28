@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
 import { api } from "../core/api";
+import type { User } from "../core/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -18,7 +19,7 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function go(action: () => Promise<{ token: string; user: any }>) {
+  async function go(action: () => Promise<{ token: string; user: User }>) {
     setBusy(true);
     setErr(null);
     try {
