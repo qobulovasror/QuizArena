@@ -1,6 +1,6 @@
 // Command seed — boshlang'ich ma'lumotni Postgres'ga yozadi (idempotent).
 //
-// Sohalar: english (generativ), math (generativ), general (statik bank).
+// Sohalar: english (generativ), math (generativ), general + programming (statik bank).
 // english/math savollari provider tomonidan generatsiya qilinadi; general savollari
 // shu yerda DB'ga yoziladi (GeneralProvider o'qiydi).
 // Ishga tushirish: DATABASE_URL=... go run ./cmd/seed   (yoki `make seed`).
@@ -51,6 +51,11 @@ func main() {
 	gen := ensureSubject("general", "Umumiy bilim", "🌍")
 	gcat := ensureCategory(gen.ID, "mixed", "Aralash")
 	seedGeneral(gcat.ID)
+
+	// programming — statik bank (terminologiya, kod natijasi). General provider o'qiydi.
+	prog := ensureSubject("programming", "Dasturlash", "💻")
+	pcat := ensureCategory(prog.ID, "fundamentals", "Asoslar")
+	seedProgramming(pcat.ID)
 
 	log.Println("seed tugadi ✓")
 }
@@ -154,6 +159,39 @@ func seedGeneral(categoryID uuid.UUID) {
 		}
 	}
 	log.Printf("✓ general savollar: %d", len(questions))
+}
+
+func seedProgramming(categoryID uuid.UUID) {
+	n, err := q.CountQuestionsByCategory(ctx, categoryID)
+	if err != nil {
+		log.Fatalf("savol soni: %v", err)
+	}
+	if n > 0 {
+		log.Printf("• programming savollar mavjud (%d)", n)
+		return
+	}
+	questions := []store.CreateQuestionParams{
+		mcqQ("HTTP qaysi portda standart ishlaydi?", "HTTP — 80, HTTPS — 443.",
+			[][2]string{{"a", "21"}, {"b", "80"}, {"c", "443"}, {"d", "8080"}}, "b"),
+		mcqQ("Qaysi tuzilma «FIFO» (birinchi kirgan birinchi chiqadi)?", "Queue — FIFO; Stack — LIFO.",
+			[][2]string{{"a", "Stack"}, {"b", "Queue"}, {"c", "Tree"}, {"d", "Graph"}}, "b"),
+		mcqQ("Binary qidiruvning vaqt murakkabligi?", "Saralangan massivda O(log n).",
+			[][2]string{{"a", "O(n)"}, {"b", "O(n²)"}, {"c", "O(log n)"}, {"d", "O(1)"}}, "c"),
+		mcqQ("Git'da o'zgarishlarni tasdiqlash buyrug'i?", "git commit.",
+			[][2]string{{"a", "git push"}, {"b", "git commit"}, {"c", "git stage"}, {"d", "git save"}}, "b"),
+		mcqQ("`SELECT` SQL buyrug'i nima qiladi?", "Ma'lumotni o'qiydi (o'zgartirmaydi).",
+			[][2]string{{"a", "O'chiradi"}, {"b", "Yangilaydi"}, {"c", "O'qiydi"}, {"d", "Qo'shadi"}}, "c"),
+		tfQ("Stack «LIFO» (oxirgi kirgan birinchi chiqadi) tamoyilida ishlaydi.", "To'g'ri.", true),
+		tfQ("HTML — bu dasturlash tili.", "Noto'g'ri, HTML — belgilash (markup) tili.", false),
+		tfQ("`==` va `===` JavaScript'da bir xil ishlaydi.", "Noto'g'ri, `===` tip ham tekshiradi.", false),
+	}
+	for _, p := range questions {
+		p.CategoryID = categoryID
+		if _, err := q.CreateQuestion(ctx, p); err != nil {
+			log.Fatalf("savol yozish: %v", err)
+		}
+	}
+	log.Printf("✓ programming savollar: %d", len(questions))
 }
 
 func mcqQ(prompt, expl string, opts [][2]string, correctID string) store.CreateQuestionParams {
