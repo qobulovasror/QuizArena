@@ -69,6 +69,7 @@ func Router(d Deps) http.Handler {
 		mh := &meHandler{q: d.Queries, logger: d.Logger}
 		sh := &srsHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
 		ah := &assessHandler{q: d.Queries, logger: d.Logger}
+		th := &tournamentHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth))
 			r.Get("/api/me/history", mh.history)
@@ -78,6 +79,11 @@ func Router(d Deps) http.Handler {
 			r.Get("/api/me/assessment", ah.questions)
 			r.Post("/api/me/assessment/submit", ah.submit) // 📊 baholash → mastery
 			r.Get("/api/me/mastery", ah.mastery)
+			// Turnirlar (asinxron musobaqa)
+			r.Get("/api/tournaments", th.list)
+			r.Get("/api/tournaments/{id}/play", th.play)
+			r.Post("/api/tournaments/{id}/submit", th.submit)
+			r.Get("/api/tournaments/{id}/leaderboard", th.leaderboard)
 		})
 
 		// Admin (RBAC: role=admin)
@@ -89,6 +95,7 @@ func Router(d Deps) http.Handler {
 			r.Post("/api/admin/questions", adm.createQuestion)
 			r.Get("/api/admin/questions", adm.listQuestions)
 			r.Delete("/api/admin/questions/{id}", adm.deleteQuestion)
+			r.Post("/api/admin/tournaments", th.create)
 		})
 	}
 
