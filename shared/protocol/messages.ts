@@ -17,7 +17,9 @@ export type ClientMsgType =
   | "room:resume"
   | "room:leave"
   | "game:start"
-  | "answer:submit";
+  | "answer:submit"
+  | "match:queue"
+  | "match:cancel";
 
 export type ServerMsgType =
   | "room:state"
@@ -28,6 +30,8 @@ export type ServerMsgType =
   | "question:reveal"
   | "player:scored"
   | "game:over"
+  | "match:queued"
+  | "match:found"
   | "error";
 
 // ---- Umumiy tuzilmalar ----
@@ -110,6 +114,10 @@ export interface AnswerSubmitData {
   questionIndex: number;
   choice: AnswerChoice;
 }
+export interface MatchQueueData {
+  subjectId: string;
+  displayName: string;
+}
 
 // ---- Server → Client yuklar ----
 export interface RoomStateData {
@@ -155,6 +163,13 @@ export interface GameOverData {
   finalLeaderboard: LeaderboardEntry[];
   teams?: TeamStanding[]; // team rejimi
 }
+export interface MatchQueuedData {
+  subjectId: string;
+}
+export interface MatchFoundData {
+  sessionId: string;
+  vsBot: boolean;
+}
 
 export type ErrorCode =
   | "BAD_REQUEST"
@@ -181,6 +196,8 @@ export interface ClientMessageMap {
   "room:leave": Record<string, never>;
   "game:start": Record<string, never>;
   "answer:submit": AnswerSubmitData;
+  "match:queue": MatchQueueData;
+  "match:cancel": Record<string, never>;
 }
 export interface ServerMessageMap {
   "room:state": RoomStateData;
@@ -191,6 +208,8 @@ export interface ServerMessageMap {
   "question:reveal": QuestionRevealData;
   "player:scored": PlayerScoredData;
   "game:over": GameOverData;
+  "match:queued": MatchQueuedData;
+  "match:found": MatchFoundData;
   error: ErrorData;
 }
 

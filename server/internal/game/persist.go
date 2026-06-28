@@ -22,6 +22,7 @@ type GameRecord struct {
 	TimePerQ      int
 	StartedAt     time.Time
 	FinishedAt    time.Time
+	Ranked        bool // 🏆 1v1 duel → ELO yangilanadi (aynan 2 persistent natija bo'lsa)
 	Results       []ResultRecord
 	Answers       []AnswerRecord
 }

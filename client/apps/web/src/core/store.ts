@@ -80,6 +80,7 @@ interface GameStore {
   gameOver: GameOverData | null;
   eliminated: boolean;
   subjects: SubjectInfo[];
+  matchSearching: boolean; // 🏆 1v1 raqib qidirilmoqda
 
   setDisplayName: (n: string) => void;
   setAuth: (token: string, user: User) => void;
@@ -88,6 +89,8 @@ interface GameStore {
   loadSubjects: () => Promise<void>;
   createRoom: (opts: CreateOpts) => void;
   joinRoom: (code: string) => void;
+  queueMatch: (subjectId: string) => void;
+  cancelMatch: () => void;
   start: () => void;
   answer: (choice: MyAnswer["choice"]) => void;
   leaveRoom: () => void;
@@ -124,6 +127,7 @@ export const useGame = create<GameStore>((set, get) => ({
   gameOver: null,
   eliminated: false,
   subjects: [],
+  matchSearching: false,
 
   setDisplayName: (n) => set({ displayName: n }),
 
@@ -176,6 +180,15 @@ export const useGame = create<GameStore>((set, get) => ({
   joinRoom: (code) =>
     send("room:join", { code: code.toUpperCase(), displayName: get().displayName || "O'yinchi" }),
 
+  queueMatch: (subjectId) => {
+    send("match:queue", { subjectId, displayName: get().displayName || "O'yinchi" });
+    set({ matchSearching: true });
+  },
+  cancelMatch: () => {
+    send("match:cancel", {});
+    set({ matchSearching: false });
+  },
+
   start: () => send("game:start", {}),
 
   answer: (choice) => {
@@ -187,7 +200,8 @@ export const useGame = create<GameStore>((set, get) => ({
 
   leaveRoom: () => {
     send("room:leave", {});
-    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false });
+    if (get().matchSearching) send("match:cancel", {});
+    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false, matchSearching: false });
   },
 
   logout: () => {
@@ -199,14 +213,14 @@ export const useGame = create<GameStore>((set, get) => ({
     set({
       token: null, user: null, status: "offline",
       room: null, sessionId: null, resumeToken: null,
-      question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false,
+      question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false, matchSearching: false,
     });
   },
 
   clearError: () => set({ error: null }),
 
   newGame: () =>
-    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false }),
+    set({ room: null, sessionId: null, resumeToken: null, question: null, reveal: null, gameOver: null, countdown: null, answeredIndex: null, myAnswer: null, eliminated: false, matchSearching: false }),
 }));
 
 function open(set: (p: Partial<GameStore>) => void, get: () => GameStore, token: string) {
@@ -286,6 +300,12 @@ function handle(env: Envelope, set: (p: Partial<GameStore>) => void, get: () => 
       if (amIOut(d.finalLeaderboard)) set({ eliminated: true });
       break;
     }
+    case "match:queued":
+      set({ matchSearching: true });
+      break;
+    case "match:found":
+      set({ matchSearching: false }); // room:joined/state ketidan o'yin boshlanadi
+      break;
     case "error": {
       const e = env.data as ErrorData;
       if (e.code === "ROOM_NOT_FOUND") {

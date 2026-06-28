@@ -18,8 +18,23 @@ const modeIds = ["classic", "survival", "time_attack", "team"];
 
 export function LobbyPage() {
   const { t } = useTranslation();
-  const { room, selfUserId, createRoom, joinRoom, start, status } = useGame();
+  const { room, selfUserId, createRoom, joinRoom, queueMatch, cancelMatch, start, status, matchSearching } = useGame();
   const online = status === "online";
+
+  if (matchSearching) {
+    return (
+      <div className="mx-auto max-w-md p-4">
+        <Card className="space-y-4 text-center">
+          <div className="animate-pulse text-5xl">🔍</div>
+          <p className="font-medium">{t("match.searching")}</p>
+          <p className="text-xs text-slate-400">{t("match.searchingHint")}</p>
+          <Button variant="outline" className="w-full" onClick={cancelMatch}>
+            {t("match.cancel")}
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (room && room.status === "lobby") {
     const isHost = selfUserId === room.host;
@@ -58,15 +73,17 @@ export function LobbyPage() {
     );
   }
 
-  return <CreateOrJoin onCreate={createRoom} onJoin={joinRoom} />;
+  return <CreateOrJoin onCreate={createRoom} onJoin={joinRoom} onQueue={queueMatch} />;
 }
 
 function CreateOrJoin({
   onCreate,
   onJoin,
+  onQueue,
 }: {
   onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number; opponent: string }) => void;
   onJoin: (code: string) => void;
+  onQueue: (subjectId: string) => void;
 }) {
   const { t } = useTranslation();
   const { subjects, loadSubjects, status } = useGame();
@@ -153,6 +170,14 @@ function CreateOrJoin({
           onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time, opponent })}
         >
           {t("lobby.createRoom")}
+        </Button>
+      </Card>
+
+      <Card className="space-y-2">
+        <h2 className="font-semibold">{t("match.duel")}</h2>
+        <p className="text-xs text-slate-400">{t("match.duelHint")}</p>
+        <Button variant="outline" className="w-full" disabled={!online} onClick={() => onQueue(subjectId)}>
+          ⚔️ {t("match.find")}
         </Button>
       </Card>
 

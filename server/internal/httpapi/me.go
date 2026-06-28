@@ -47,3 +47,32 @@ func (h *meHandler) history(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, items)
 }
+
+type ratingItem struct {
+	Subject     string `json:"subject"`
+	SubjectName string `json:"subjectName"`
+	Rating      int32  `json:"rating"`
+	Games       int32  `json:"games"`
+}
+
+// rating — joriy foydalanuvchining soha bo'yicha ELO reytingi (🏆 1v1).
+func (h *meHandler) rating(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(userIDFrom(r))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "user id yaroqsiz")
+		return
+	}
+	rows, err := h.q.ListRatingsByUser(r.Context(), id)
+	if err != nil {
+		h.logger.Error("rating", "err", err)
+		writeErr(w, http.StatusInternalServerError, "reytingni olishda xato")
+		return
+	}
+	items := make([]ratingItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, ratingItem{
+			Subject: row.SubjectSlug, SubjectName: row.SubjectName, Rating: row.Rating, Games: row.Games,
+		})
+	}
+	writeJSON(w, http.StatusOK, items)
+}

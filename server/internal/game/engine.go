@@ -462,7 +462,7 @@ func (e *Engine) persist(room *state.Room) {
 		Code: room.Code, HostUserID: room.HostID, SubjectSlug: room.Config.SubjectID,
 		Mode: room.Config.Mode, Opponent: room.Config.Opponent,
 		QuestionCount: room.Config.QuestionCount, TimePerQ: room.Config.TimePerQ,
-		StartedAt: room.StartedAt, FinishedAt: time.Now(),
+		StartedAt: room.StartedAt, FinishedAt: time.Now(), Ranked: room.Ranked,
 	}
 	persistentOf := make(map[string]bool, len(room.Players))
 	for id, p := range room.Players {

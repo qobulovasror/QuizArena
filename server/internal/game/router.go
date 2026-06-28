@@ -8,13 +8,17 @@ import (
 
 // Router — WebSocket xabarlarini engine amallariga bog'laydi (ws.Router interfeysi).
 // EchoRouter o'rnini bosadi.
-type Router struct{ e *Engine }
+type Router struct {
+	e  *Engine
+	mm *Matchmaker
+}
 
-func NewRouter(e *Engine) *Router { return &Router{e: e} }
+func NewRouter(e *Engine) *Router { return &Router{e: e, mm: NewMatchmaker(e)} }
 
 func (r *Router) OnConnect(c *ws.Client) {}
 
 func (r *Router) OnDisconnect(c *ws.Client) {
+	r.mm.Cancel(c) // navbatda bo'lsa chiqaramiz
 	r.e.HandleDisconnect(c)
 }
 
@@ -53,6 +57,16 @@ func (r *Router) Route(c *ws.Client, env ws.Envelope) {
 			return
 		}
 		r.e.SubmitAnswer(c, d)
+
+	case ws.CMatchQueue:
+		var d ws.MatchQueueData
+		if !decode(c, env.Data, &d) {
+			return
+		}
+		r.mm.Queue(c, d.SubjectID, d.DisplayName)
+
+	case ws.CMatchCancel:
+		r.mm.Cancel(c)
 
 	default:
 		c.SendError(ws.ErrInvalidMessage, "noma'lum xabar turi")

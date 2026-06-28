@@ -49,6 +49,27 @@ func dialWSWith(t *testing.T, e *Engine, authFn ws.AuthFunc) *websocket.Conn {
 	return conn
 }
 
+// dialShared — bitta server (ya'ni bitta Router/Matchmaker) ga n ulanish.
+// Matchmaking testi uchun kerak: productionda Router bitta, harness esa har
+// dialWS uchun yangi Router yaratadi (umumiy hub/store orqali xona ishlaydi,
+// lekin matchmaker holati Router ichida).
+func dialShared(t *testing.T, e *Engine, n int) []*websocket.Conn {
+	t.Helper()
+	srv := httptest.NewServer(ws.Handle(e.hub, NewRouter(e), nil, e.logger))
+	t.Cleanup(srv.Close)
+	url := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conns := make([]*websocket.Conn, n)
+	for i := range conns {
+		c, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			t.Fatalf("dial: %v", err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		conns[i] = c
+	}
+	return conns
+}
+
 func jraw(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 
 // correctOptionID — server holatidan birinchi savolning to'g'ri optionId'sini oladi (oq-quti).
@@ -215,6 +236,36 @@ func TestTeamStandings(t *testing.T) {
 	room.Config.Mode = "classic"
 	if e.teamStandings(room) != nil {
 		t.Fatal("team bo'lmagan rejimda nil kutilgan")
+	}
+}
+
+// 🏆 Matchmaking: ikki o'yinchi navbatga qo'shilsa juftlanadi va duel boshlanadi.
+func TestMatchmakingDuel(t *testing.T) {
+	e, _ := newTestEngine()
+	conns := dialShared(t, e, 2)
+	a, b := conns[0], conns[1]
+
+	send(t, a, ws.CMatchQueue, ws.MatchQueueData{SubjectID: "x", DisplayName: "A"})
+	expect(t, a, ws.SMatchQueued) // A kutmoqda
+
+	send(t, b, ws.CMatchQueue, ws.MatchQueueData{SubjectID: "x", DisplayName: "B"})
+
+	// Ikkalasi ham raqib topdi → duel boshlanadi.
+	for _, c := range []*websocket.Conn{a, b} {
+		found := expect(t, c, ws.SMatchFound)
+		var mf ws.MatchFoundData
+		_ = json.Unmarshal(found.Data, &mf)
+		if mf.VsBot {
+			t.Fatal("inson-inson duel kutilgan (VsBot=false)")
+		}
+		expect(t, c, ws.SRoomJoined)
+		st := expect(t, c, ws.SRoomState)
+		var rs ws.RoomStateData
+		_ = json.Unmarshal(st.Data, &rs)
+		if len(rs.Players) != 2 || rs.Status != "running" {
+			t.Fatalf("2 o'yinchili running duel kutilgan: %+v", rs)
+		}
+		expect(t, c, ws.SQuestionShow) // o'yin ketmoqda
 	}
 }
 

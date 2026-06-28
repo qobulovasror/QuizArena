@@ -103,3 +103,11 @@ type UserMastery struct {
 	Attempts   int32     `json:"attempts"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
+
+type UserRating struct {
+	UserID    uuid.UUID `json:"user_id"`
+	SubjectID uuid.UUID `json:"subject_id"`
+	Rating    int32     `json:"rating"`
+	Games     int32     `json:"games"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

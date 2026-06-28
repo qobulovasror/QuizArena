@@ -70,6 +70,14 @@ const uz = {
       eliminated: "Siz o'yindan chiqib ketdingiz — tomoshabin sifatida kuzatyapsiz",
     },
     result: { gameOver: "O'yin tugadi 🎉", newGame: "Yangi o'yin", teams: "Jamoa natijasi", team: "Jamoa {{team}}" },
+    match: {
+      duel: "⚔️ 1v1 Duel",
+      duelHint: "Tanlangan soha bo'yicha raqib top — ELO reyting hisoblanadi.",
+      find: "Raqib topish",
+      searching: "Raqib qidirilmoqda…",
+      searchingHint: "Raqib topilmasa, bot bilan o'ynaysiz.",
+      cancel: "Bekor qilish",
+    },
     practice: {
       showAnswer: "Javobni ko'rsatish",
       howWell: "Qanchalik yaxshi esladingiz?",
@@ -162,6 +170,14 @@ const en = {
       eliminated: "You're eliminated — watching as a spectator",
     },
     result: { gameOver: "Game over 🎉", newGame: "New game", teams: "Team results", team: "Team {{team}}" },
+    match: {
+      duel: "⚔️ 1v1 Duel",
+      duelHint: "Find an opponent in the selected subject — ELO rated.",
+      find: "Find opponent",
+      searching: "Searching for opponent…",
+      searchingHint: "If none is found, you'll play a bot.",
+      cancel: "Cancel",
+    },
     practice: {
       showAnswer: "Show answer",
       howWell: "How well did you recall?",

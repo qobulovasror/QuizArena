@@ -95,6 +95,7 @@ type Room struct {
 	StartedAt      time.Time
 	GlobalDeadline int64         // time_attack: butun o'yin uchun yagona deadline (epoch ms)
 	Answers        []AnswerEvent // o'yin davomida yig'iladi, tugagach answers_log'ga yoziladi
+	Ranked         bool          // 🏆 1v1 matchmaking duel → tugagach ELO yangilanadi
 }
 
 // Store — jonli xonalar ombori interfeysi.

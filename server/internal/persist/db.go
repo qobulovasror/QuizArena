@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/azizbek12234/quizarena/server/internal/game"
+	"github.com/azizbek12234/quizarena/server/internal/rating"
 	"github.com/azizbek12234/quizarena/server/internal/store"
 )
 
@@ -85,5 +86,48 @@ func (d *DB) SaveGame(ctx context.Context, rec game.GameRecord) error {
 			return fmt.Errorf("javob logini yozish: %w", err)
 		}
 	}
+
+	// 🏆 1v1 duel — ELO reytingini yangilash (aynan 2 persistent natija bo'lsa).
+	if rec.Ranked && len(rec.Results) == 2 {
+		if err := d.applyElo(ctx, subj.ID, rec.Results); err != nil {
+			return fmt.Errorf("reyting yangilash: %w", err)
+		}
+	}
 	return nil
+}
+
+// applyElo — duel natijasiga ko'ra ikki o'yinchining subject reytingini yangilaydi.
+func (d *DB) applyElo(ctx context.Context, subjectID uuid.UUID, results []game.ResultRecord) error {
+	a, b := results[0], results[1]
+	aid, err1 := uuid.Parse(a.UserID)
+	bid, err2 := uuid.Parse(b.UserID)
+	if err1 != nil || err2 != nil {
+		return nil // anonim — ELO yo'q
+	}
+	ra := d.ratingOf(ctx, aid, subjectID)
+	rb := d.ratingOf(ctx, bid, subjectID)
+
+	var sa, sb float64
+	switch {
+	case a.Score > b.Score:
+		sa, sb = 1, 0
+	case a.Score < b.Score:
+		sa, sb = 0, 1
+	default:
+		sa, sb = 0.5, 0.5
+	}
+
+	if err := d.q.UpsertRating(ctx, store.UpsertRatingParams{UserID: aid, SubjectID: subjectID, Rating: int32(rating.Next(ra, rb, sa))}); err != nil {
+		return err
+	}
+	return d.q.UpsertRating(ctx, store.UpsertRatingParams{UserID: bid, SubjectID: subjectID, Rating: int32(rating.Next(rb, ra, sb))})
+}
+
+// ratingOf — o'yinchining joriy reytingi (yozuv yo'q bo'lsa boshlang'ich).
+func (d *DB) ratingOf(ctx context.Context, userID, subjectID uuid.UUID) int {
+	r, err := d.q.GetRating(ctx, store.GetRatingParams{UserID: userID, SubjectID: subjectID})
+	if err != nil {
+		return rating.Default
+	}
+	return int(r.Rating)
 }

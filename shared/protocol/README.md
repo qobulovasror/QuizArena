@@ -45,6 +45,8 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 | `room:leave` | `{}` | Xonadan chiqish. |
 | `game:start` | `{}` | O'yinni boshlash (**faqat host**). |
 | `answer:submit` | `{ questionIndex, choice }` | Xom javob. `choice` shakli savol turiga bog'liq (§6). To'g'rilik **client'ga bog'liq emas** — server hal qiladi. |
+| `match:queue` | `{ subjectId, displayName }` | 🏆 1v1 navbatga qo'shilish (subject slug bo'yicha). |
+| `match:cancel` | `{}` | Navbatdan chiqish. |
 
 ## 4. Server → Client xabarlar
 
@@ -58,6 +60,8 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 | `question:reveal` | `{ index, correct, explanation?, leaderboard[], teams? }` | Deadline tugagach: to'g'ri javob + izoh + reyting. `teams` — faqat team rejimi. |
 | `player:scored` | `{ leaderboard[] }` | *Ixtiyoriy* jonli reyting yangilanishi. |
 | `game:over` | `{ finalLeaderboard[], teams? }` | O'yin tugadi. `teams` — faqat team rejimi. |
+| `match:queued` | `{ subjectId }` | 🏆 Navbatga qo'shildi (raqib kutilmoqda). |
+| `match:found` | `{ sessionId, vsBot }` | Raqib topildi; ketidan `room:joined`+`room:state(running)` keladi va duel boshlanadi. |
 | `error` | `{ code, message }` | Xato (§7 kodlari). |
 
 ---
@@ -146,6 +150,22 @@ server ► game:over { finalLeaderboard }
   so'ng har kim **o'z** `question:show`'ini oladi (`deadlineTs` — butun o'yin uchun yagona).
   Har `answer:submit` → `answer:ack` + **darhol keyingi** `question:show` (reveal **yo'q**).
   Savollar tugaganda yoki yagona deadline kelganda `game:over`. Ball = to'g'ri javob soni.
+
+### 8.2 🏆 Matchmaking (1v1 duel)
+
+```
+client ► match:queue { subjectId, displayName }
+server ► match:queued { subjectId }              (raqib kutilmoqda)
+   ├─ raqib topildi (yoki ~10s dan keyin bot):
+   │  server ► match:found { sessionId, vsBot }
+   │  server ► room:joined { ... } + room:state (running)
+   │  └─ keyin oddiy classic oqim (§8) — countdown, savollar, game:over
+   └─ client ► match:cancel  → navbatdan chiqadi
+```
+
+> Duel — `classic` rejim (5 savol, 15s). Ikki inson o'ynasa **reytingli**: o'yin
+> tugagach ikkalasining subject ELO reytingi yangilanadi (`GET /api/me/rating`).
+> Bot bilan duel reytingsiz. Uzilish navbatdan avtomatik chiqaradi.
 
 ## 9. Reconnect
 
