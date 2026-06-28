@@ -102,6 +102,20 @@ export interface AssessAnswer {
   choice: unknown;
 }
 
+export interface RatingItem {
+  subject: string;
+  subjectName: string;
+  rating: number;
+  games: number;
+}
+
+export interface LeaderboardRow {
+  username: string;
+  totalScore: number;
+  games: number;
+  correct: number;
+}
+
 export const api = {
   guest: () => post<AuthResp>("/api/auth/guest", {}),
   register: (username: string, email: string, password: string) =>
@@ -120,6 +134,9 @@ export const api = {
   assessSubmit: (answers: AssessAnswer[], token: string) =>
     authPost<{ correct: number; total: number }>("/api/me/assessment/submit", { answers }, token),
   categories: (subjectId: string) => get<CategoryInfo[]>(`/api/subjects/${subjectId}/categories`),
+  // --- reyting ---
+  globalLeaderboard: () => get<LeaderboardRow[]>("/api/leaderboard/global"),
+  myRating: (token: string) => authGet<RatingItem[]>("/api/me/rating", token),
   // --- admin ---
   adminCreateSubject: (body: { slug: string; name: string; icon: string }, token: string) =>
     authPost<{ id: string }>("/api/admin/subjects", body, token),

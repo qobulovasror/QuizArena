@@ -25,7 +25,7 @@ const uz = {
       loginBtn: "Kirish",
       registerBtn: "Ro'yxatdan o'tish",
     },
-    home: { compete: "🏆 O'ynash", practice: "📚 O'rganish", assess: "📊 Baholash", admin: "🛠 Admin" },
+    home: { compete: "🏆 O'ynash", practice: "📚 O'rganish", assess: "📊 Baholash", rating: "🏅 Reyting", admin: "🛠 Admin" },
     lobby: {
       roomCode: "Xona kodi",
       shareCode: "Do'stlaringizga kodni ulashing",
@@ -98,6 +98,12 @@ const uz = {
       percentCorrect: "{{pct}}% to'g'ri · daraja yangilandi",
       back: "Qaytish",
     },
+    rating: {
+      myRating: "Mening reytingim",
+      global: "Global reyting",
+      noRating: "Hali duel o'ynamadingiz.",
+      games: "{{count}} o'yin",
+    },
   },
 };
 
@@ -125,7 +131,7 @@ const en = {
       loginBtn: "Log in",
       registerBtn: "Sign up",
     },
-    home: { compete: "🏆 Play", practice: "📚 Learn", assess: "📊 Assess", admin: "🛠 Admin" },
+    home: { compete: "🏆 Play", practice: "📚 Learn", assess: "📊 Assess", rating: "🏅 Rating", admin: "🛠 Admin" },
     lobby: {
       roomCode: "Room code",
       shareCode: "Share the code with friends",
@@ -197,6 +203,12 @@ const en = {
       result: "Result",
       percentCorrect: "{{pct}}% correct · level updated",
       back: "Back",
+    },
+    rating: {
+      myRating: "My rating",
+      global: "Global leaderboard",
+      noRating: "You haven't played any duels yet.",
+      games: "{{count}} games",
     },
   },
 };

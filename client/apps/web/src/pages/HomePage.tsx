@@ -5,14 +5,16 @@ import { LobbyPage } from "./LobbyPage";
 import { PracticePage } from "./PracticePage";
 import { AssessPage } from "./AssessPage";
 import { AdminPage } from "./AdminPage";
+import { RatingPage } from "./RatingPage";
 import { cn } from "../lib/cn";
 
-type Tab = "compete" | "practice" | "assess" | "admin";
+type Tab = "compete" | "practice" | "assess" | "rating" | "admin";
 
 const baseTabs: { id: Tab; key: string }[] = [
   { id: "compete", key: "home.compete" },
   { id: "practice", key: "home.practice" },
   { id: "assess", key: "home.assess" },
+  { id: "rating", key: "home.rating" },
 ];
 
 export function HomePage() {
@@ -43,6 +45,7 @@ export function HomePage() {
       {tab === "compete" && <LobbyPage />}
       {tab === "practice" && <PracticePage />}
       {tab === "assess" && <AssessPage />}
+      {tab === "rating" && <RatingPage />}
       {tab === "admin" && <AdminPage />}
     </div>
   );

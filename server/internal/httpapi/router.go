@@ -59,6 +59,10 @@ func Router(d Deps) http.Handler {
 			r.Get("/", sh.list)
 			r.Get("/{id}/categories", sh.categories)
 		})
+
+		// Global reyting (ochiq, auth shart emas)
+		lh := &leaderboardHandler{q: d.Queries, logger: d.Logger}
+		r.Get("/api/leaderboard/global", lh.global)
 	}
 
 	if d.Auth != nil && d.Queries != nil {
