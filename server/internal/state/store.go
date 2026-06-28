@@ -76,6 +76,7 @@ type Config struct {
 	CategoryID    string
 	Mode          string
 	Opponent      string
+	BotDifficulty string // 🏆 bot raqib qiyinligi: easy|medium|hard (bo'sh → default)
 	QuestionCount int
 	TimePerQ      int
 }

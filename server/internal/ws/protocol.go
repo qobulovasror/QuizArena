@@ -24,6 +24,8 @@ const (
 	CRoomLeave    MsgType = "room:leave"
 	CGameStart    MsgType = "game:start"
 	CAnswerSubmit MsgType = "answer:submit"
+	CMatchQueue   MsgType = "match:queue"  // 🏆 1v1 navbatga qo'shilish
+	CMatchCancel  MsgType = "match:cancel" // navbatdan chiqish
 )
 
 // Server → Client
@@ -36,6 +38,8 @@ const (
 	SQuestionReveal MsgType = "question:reveal"
 	SPlayerScored   MsgType = "player:scored"
 	SGameOver       MsgType = "game:over"
+	SMatchQueued    MsgType = "match:queued" // navbatga qo'shildi (raqib kutilmoqda)
+	SMatchFound     MsgType = "match:found"  // raqib topildi (duel boshlanadi)
 	SError          MsgType = "error"
 )
 
@@ -88,7 +92,8 @@ type RoomCreateData struct {
 	SubjectID     string `json:"subjectId"`
 	CategoryID    string `json:"categoryId,omitempty"`
 	Mode          string `json:"mode"`
-	Opponent      string `json:"opponent,omitempty"` // human|bot|mixed
+	Opponent      string `json:"opponent,omitempty"`      // human|bot|mixed
+	BotDifficulty string `json:"botDifficulty,omitempty"` // easy|medium|hard
 	QuestionCount int    `json:"questionCount"`
 	TimePerQ      int    `json:"timePerQ"`
 	DisplayName   string `json:"displayName"` // host ham o'yinchi
@@ -108,6 +113,12 @@ type RoomResumeData struct {
 type AnswerSubmitData struct {
 	QuestionIndex int             `json:"questionIndex"`
 	Choice        json.RawMessage `json:"choice"`
+}
+
+// MatchQueueData — 1v1 navbatga qo'shilish (soha + ko'rinadigan ism).
+type MatchQueueData struct {
+	SubjectID   string `json:"subjectId"`
+	DisplayName string `json:"displayName"`
 }
 
 // ---- Server → Client yuklar ----
@@ -161,6 +172,17 @@ type PlayerScoredData struct {
 type GameOverData struct {
 	FinalLeaderboard []LeaderboardEntry `json:"finalLeaderboard"`
 	Teams            []TeamStanding     `json:"teams,omitempty"` // team rejimi
+}
+
+// MatchQueuedData — navbatga qo'shilgani tasdiq (raqib kutilmoqda).
+type MatchQueuedData struct {
+	SubjectID string `json:"subjectId"`
+}
+
+// MatchFoundData — raqib topildi; duel xonasi (room:joined/state ketidan keladi).
+type MatchFoundData struct {
+	SessionID string `json:"sessionId"`
+	VsBot     bool   `json:"vsBot"`
 }
 
 type ErrorData struct {

@@ -269,6 +269,55 @@ func TestMatchmakingDuel(t *testing.T) {
 	}
 }
 
+// botProb — qiyilik darajasi ehtimolga to'g'ri xaritalanadi; bo'sh → BotCorrectProb.
+func TestBotProb(t *testing.T) {
+	e, _ := newTestEngine()
+	mk := func(d string) *state.Room { return &state.Room{Config: state.Config{BotDifficulty: d}} }
+	if e.botProb(mk("easy")) != 0.45 || e.botProb(mk("medium")) != 0.65 || e.botProb(mk("hard")) != 0.85 {
+		t.Fatal("qiyinlik → ehtimol mapping xato")
+	}
+	e.BotCorrectProb = 0.7
+	if e.botProb(mk("")) != 0.7 {
+		t.Fatalf("default BotCorrectProb kutilgan: %v", e.botProb(mk("")))
+	}
+}
+
+// 🏆 time_attack'da bot: xonaga bot qo'shiladi va o'yin yakunida leaderboard'da bo'ladi.
+func TestTimeAttackBot(t *testing.T) {
+	e, store := newTestEngine()
+	e.BotCorrectProb = 1.0
+	conn := dialWS(t, e)
+
+	send(t, conn, ws.CRoomCreate, ws.RoomCreateData{
+		SubjectID: "x", Mode: "time_attack", Opponent: "bot", QuestionCount: 2, TimePerQ: 1, DisplayName: "Host",
+	})
+	joined := expect(t, conn, ws.SRoomJoined)
+	var rj ws.RoomJoinedData
+	_ = json.Unmarshal(joined.Data, &rj)
+	st := expect(t, conn, ws.SRoomState)
+	var rs ws.RoomStateData
+	_ = json.Unmarshal(st.Data, &rs)
+	if len(rs.Players) != 2 {
+		t.Fatalf("time_attack'da host+bot kutilgan: %+v", rs.Players)
+	}
+
+	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // running
+	expect(t, conn, ws.SQuestionShow)
+	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{QuestionIndex: 0, Choice: jraw(map[string]string{"optionId": correctOptionIDAt(t, store, rj.SessionID, 0)})})
+	expect(t, conn, ws.SAnswerAck)
+	expect(t, conn, ws.SQuestionShow)
+	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{QuestionIndex: 1, Choice: jraw(map[string]string{"optionId": correctOptionIDAt(t, store, rj.SessionID, 1)})})
+	expect(t, conn, ws.SAnswerAck)
+
+	over := expect(t, conn, ws.SGameOver)
+	var ov ws.GameOverData
+	_ = json.Unmarshal(over.Data, &ov)
+	if len(ov.FinalLeaderboard) != 2 {
+		t.Fatalf("2 o'yinchi (host+bot) kutilgan: %+v", ov.FinalLeaderboard)
+	}
+}
+
 // 🏆 Bot raqib: opponent=bot xonada bot o'yinchi paydo bo'ladi va javob beradi.
 func TestBotOpponent(t *testing.T) {
 	e, _ := newTestEngine()

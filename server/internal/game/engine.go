@@ -78,7 +78,8 @@ func (e *Engine) CreateRoom(c *ws.Client, d ws.RoomCreateData) {
 		Status:    state.Lobby,
 		Config: state.Config{
 			SubjectID: d.SubjectID, CategoryID: d.CategoryID, Mode: mode,
-			Opponent: orDefault(d.Opponent, "human"), QuestionCount: d.QuestionCount, TimePerQ: d.TimePerQ,
+			Opponent: orDefault(d.Opponent, "human"), BotDifficulty: d.BotDifficulty,
+			QuestionCount: d.QuestionCount, TimePerQ: d.TimePerQ,
 		},
 		Players: map[string]*state.Player{
 			userID: {UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs(), Persistent: c.AuthUserID() != ""},
@@ -421,16 +422,24 @@ func (e *Engine) runTimeAttack(room *state.Room) {
 	deadline := nowMs() + budget
 	room.GlobalDeadline = deadline
 	ids := make([]string, 0, len(room.Players))
+	var botIDs []string
 	for id, p := range room.Players {
 		p.TaIdx, p.TaDone = 0, false
 		ids = append(ids, id)
+		if p.IsBot {
+			botIDs = append(botIDs, id)
+		}
 	}
 	first := room.Questions[0]
 	room.Mu.Unlock()
 
-	// Har o'yinchiga birinchi savol (yagona deadline bilan).
+	// Har INSON o'yinchiga birinchi savol (yagona deadline bilan); botlar real client emas.
 	for _, id := range ids {
 		e.hub.SendToUser(sessionID, id, ws.SQuestionShow, e.showPayload(first, 0, total, deadline))
+	}
+	// Botlar o'z tezligida savollarni "yechadi".
+	for _, id := range botIDs {
+		go e.runBotTimeAttack(room, id, deadline)
 	}
 
 	// Deadline yoki barcha (ulangan) o'yinchilar tugaguncha kutamiz.
@@ -561,16 +570,31 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 	return entries
 }
 
-// wantsBot — raqib bot/mixed va rejim sinxron (per-player time_attack hozircha botsiz).
+// wantsBot — raqib bot/mixed bo'lsa va rejim botni qo'llab-quvvatlasa.
 func wantsBot(mode, opponent string) bool {
 	if opponent != "bot" && opponent != "mixed" {
 		return false
 	}
 	switch mode {
-	case "classic", "survival", "team":
+	case "classic", "survival", "team", "time_attack":
 		return true
 	}
 	return false
+}
+
+// botProb — bot to'g'ri javob ehtimoli (qiyinlik darajasiga ko'ra). Daraja bo'sh bo'lsa
+// Engine sozlamasi (BotCorrectProb) — test override yoki default o'rta.
+func (e *Engine) botProb(room *state.Room) float64 {
+	switch room.Config.BotDifficulty {
+	case "easy":
+		return 0.45
+	case "medium":
+		return 0.65
+	case "hard":
+		return 0.85
+	default:
+		return e.BotCorrectProb
+	}
 }
 
 // addBot — xonaga simulyatsion raqib qo'shadi (Persistent emas → DB'ga yozilmaydi).
@@ -578,6 +602,33 @@ func addBot(room *state.Room) {
 	id := uuid.NewString()
 	room.Players[id] = &state.Player{
 		UserID: id, Name: "🤖 Bot", Connected: true, IsBot: true, JoinedAt: nowMs(),
+	}
+}
+
+// runBotTimeAttack — time_attack per-player oqimida bot o'z savollarini ketma-ket
+// (tasodifiy oraliqlar bilan) ehtimoliy javoblaydi, TaDone bo'lguncha yoki deadline'gacha.
+func (e *Engine) runBotTimeAttack(room *state.Room, botID string, deadline int64) {
+	prob := e.botProb(room)
+	total := len(room.Questions)
+	for nowMs() < deadline {
+		time.Sleep(time.Duration(300+rand.Intn(900)) * time.Millisecond)
+		room.Mu.Lock()
+		if room.Status != state.Running {
+			room.Mu.Unlock()
+			return
+		}
+		bp := room.Players[botID]
+		if bp == nil || bp.TaDone || bp.TaIdx >= total {
+			room.Mu.Unlock()
+			return
+		}
+		q := room.Questions[bp.TaIdx]
+		modes.For("time_attack").OnAnswer(bp, q, rand.Float64() < prob, nowMs())
+		bp.TaIdx++
+		if bp.TaIdx >= total {
+			bp.TaDone = true
+		}
+		room.Mu.Unlock()
 	}
 }
 
@@ -600,10 +651,11 @@ func (e *Engine) scheduleBots(room *state.Room, q *state.LiveQuestion, deadline 
 	if span <= 0 {
 		return
 	}
+	prob := e.botProb(room)
 	for _, id := range botIDs {
 		botID := id
 		delay := time.Duration(float64(span)*(0.2+0.6*rand.Float64())) * time.Millisecond
-		correct := rand.Float64() < e.BotCorrectProb
+		correct := rand.Float64() < prob
 		time.AfterFunc(delay, func() {
 			room.Mu.Lock()
 			defer room.Mu.Unlock()

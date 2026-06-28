@@ -98,6 +98,7 @@ export interface RoomCreateData {
   categoryId?: string;
   mode: GameMode;
   opponent?: OpponentKind;
+  botDifficulty?: "easy" | "medium" | "hard";
   questionCount: number;
   timePerQ: number;
   displayName: string; // host ham o'yinchi

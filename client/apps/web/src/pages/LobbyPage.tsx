@@ -81,7 +81,7 @@ function CreateOrJoin({
   onJoin,
   onQueue,
 }: {
-  onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number; opponent: string }) => void;
+  onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number; opponent: string; botDifficulty: string }) => void;
   onJoin: (code: string) => void;
   onQueue: (subjectId: string) => void;
 }) {
@@ -91,6 +91,7 @@ function CreateOrJoin({
   const [subjectId, setSubjectId] = useState("english");
   const [mode, setMode] = useState("classic");
   const [opponent, setOpponent] = useState("human");
+  const [botDifficulty, setBotDifficulty] = useState("medium");
   const [count, setCount] = useState(5);
   const [time, setTime] = useState(15);
   const [code, setCode] = useState("");
@@ -154,6 +155,22 @@ function CreateOrJoin({
             </button>
           ))}
         </div>
+        {opponent === "bot" && (
+          <div className="grid grid-cols-3 gap-2">
+            {["easy", "medium", "hard"].map((d) => (
+              <button
+                key={d}
+                onClick={() => setBotDifficulty(d)}
+                className={cn(
+                  "rounded-lg border px-2 py-1.5 text-xs transition",
+                  botDifficulty === d ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:bg-slate-50",
+                )}
+              >
+                {t(`lobby.diff_${d}`)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
             {t("lobby.questionCount")}
@@ -167,7 +184,7 @@ function CreateOrJoin({
         <Button
           className="w-full"
           disabled={!online}
-          onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time, opponent })}
+          onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time, opponent, botDifficulty })}
         >
           {t("lobby.createRoom")}
         </Button>

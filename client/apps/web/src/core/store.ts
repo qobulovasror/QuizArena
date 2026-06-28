@@ -41,6 +41,7 @@ interface CreateOpts {
   questionCount: number;
   timePerQ: number;
   opponent?: string; // human | bot
+  botDifficulty?: string; // easy | medium | hard
 }
 
 // Javob shakli savol turiga bog'liq (README §6) — barcha maydonlar ixtiyoriy.
@@ -167,13 +168,14 @@ export const useGame = create<GameStore>((set, get) => ({
     open(set, get, token);
   },
 
-  createRoom: ({ subjectId, mode, questionCount, timePerQ, opponent }) =>
+  createRoom: ({ subjectId, mode, questionCount, timePerQ, opponent, botDifficulty }) =>
     send("room:create", {
       subjectId,
       mode,
       questionCount,
       timePerQ,
       opponent: opponent ?? "human",
+      botDifficulty: botDifficulty ?? "medium",
       displayName: get().displayName || "O'yinchi",
     }),
 

@@ -39,7 +39,7 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 
 | `type` | `data` | Izoh |
 |---|---|---|
-| `room:create` | `{ subjectId, categoryId?, mode, opponent?, questionCount, timePerQ, displayName }` | Xona yaratish; yuboruvchi **host** (va o'yinchi) bo'ladi. `mode`=classic/... ; `opponent`=human/bot/mixed. `timePerQ` — soniya. |
+| `room:create` | `{ subjectId, categoryId?, mode, opponent?, botDifficulty?, questionCount, timePerQ, displayName }` | Xona yaratish; yuboruvchi **host** (va o'yinchi) bo'ladi. `mode`=classic/... ; `opponent`=human/bot/mixed; `botDifficulty`=easy/medium/hard (bot raqibda). `timePerQ` — soniya. |
 | `room:join` | `{ code, displayName }` | Kod bilan qo'shilish. |
 | `room:resume` | `{ sessionId, resumeToken }` | Uzilishdan keyin qayta ulanish (token `room:joined` da berilgan). |
 | `room:leave` | `{}` | Xonadan chiqish. |
