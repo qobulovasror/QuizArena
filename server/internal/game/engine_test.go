@@ -218,6 +218,43 @@ func TestTeamStandings(t *testing.T) {
 	}
 }
 
+// 🏆 Bot raqib: opponent=bot xonada bot o'yinchi paydo bo'ladi va javob beradi.
+func TestBotOpponent(t *testing.T) {
+	e, _ := newTestEngine()
+	e.BotCorrectProb = 1.0 // deterministik: bot har doim to'g'ri
+	conn := dialWS(t, e)
+
+	send(t, conn, ws.CRoomCreate, ws.RoomCreateData{
+		SubjectID: "x", Mode: "classic", Opponent: "bot", QuestionCount: 1, TimePerQ: 1, DisplayName: "Host",
+	})
+	expect(t, conn, ws.SRoomJoined)
+	st := expect(t, conn, ws.SRoomState)
+	var rs ws.RoomStateData
+	_ = json.Unmarshal(st.Data, &rs)
+	if len(rs.Players) != 2 { // host + bot
+		t.Fatalf("lobby'da 2 o'yinchi (host+bot) kutilgan: %+v", rs.Players)
+	}
+
+	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // running
+	expect(t, conn, ws.SQuestionShow)
+	// Host javob bermaydi; bot deadline ichida javob beradi.
+	expect(t, conn, ws.SQuestionReveal)
+	over := expect(t, conn, ws.SGameOver)
+	var ov ws.GameOverData
+	_ = json.Unmarshal(over.Data, &ov)
+
+	var bot *ws.LeaderboardEntry
+	for i := range ov.FinalLeaderboard {
+		if ov.FinalLeaderboard[i].Name == "🤖 Bot" {
+			bot = &ov.FinalLeaderboard[i]
+		}
+	}
+	if bot == nil || bot.CorrectCnt != 1 {
+		t.Fatalf("bot 1 to'g'ri javob bilan kutilgan: %+v", ov.FinalLeaderboard)
+	}
+}
+
 // match/categorize: targets (o'ng tomon/toifalar) question:show payload'iga kiradi.
 func TestShowPayloadTargets(t *testing.T) {
 	e, _ := newTestEngine()

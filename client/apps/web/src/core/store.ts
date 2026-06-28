@@ -40,6 +40,7 @@ interface CreateOpts {
   mode: string;
   questionCount: number;
   timePerQ: number;
+  opponent?: string; // human | bot
 }
 
 // Javob shakli savol turiga bog'liq (README §6) — barcha maydonlar ixtiyoriy.
@@ -162,12 +163,13 @@ export const useGame = create<GameStore>((set, get) => ({
     open(set, get, token);
   },
 
-  createRoom: ({ subjectId, mode, questionCount, timePerQ }) =>
+  createRoom: ({ subjectId, mode, questionCount, timePerQ, opponent }) =>
     send("room:create", {
       subjectId,
       mode,
       questionCount,
       timePerQ,
+      opponent: opponent ?? "human",
       displayName: get().displayName || "O'yinchi",
     }),
 

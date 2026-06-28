@@ -65,7 +65,7 @@ function CreateOrJoin({
   onCreate,
   onJoin,
 }: {
-  onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number }) => void;
+  onCreate: (o: { subjectId: string; mode: string; questionCount: number; timePerQ: number; opponent: string }) => void;
   onJoin: (code: string) => void;
 }) {
   const { t } = useTranslation();
@@ -73,6 +73,7 @@ function CreateOrJoin({
   const online = status === "online";
   const [subjectId, setSubjectId] = useState("english");
   const [mode, setMode] = useState("classic");
+  const [opponent, setOpponent] = useState("human");
   const [count, setCount] = useState(5);
   const [time, setTime] = useState(15);
   const [code, setCode] = useState("");
@@ -121,6 +122,21 @@ function CreateOrJoin({
             </button>
           ))}
         </div>
+        <p className="text-sm text-slate-500">{t("lobby.opponent")}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {["human", "bot"].map((o) => (
+            <button
+              key={o}
+              onClick={() => setOpponent(o)}
+              className={cn(
+                "rounded-xl border px-3 py-2 text-sm transition",
+                opponent === o ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:bg-slate-50",
+              )}
+            >
+              {t(`lobby.${o}`)}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
             {t("lobby.questionCount")}
@@ -134,7 +150,7 @@ function CreateOrJoin({
         <Button
           className="w-full"
           disabled={!online}
-          onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time })}
+          onClick={() => onCreate({ subjectId, mode, questionCount: count, timePerQ: time, opponent })}
         >
           {t("lobby.createRoom")}
         </Button>

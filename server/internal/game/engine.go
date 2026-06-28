@@ -32,17 +32,20 @@ type Engine struct {
 
 	Countdown int           // boshlanish sanog'i (soniya); testda 0
 	RevealGap time.Duration // reveal'dan keyingi pauza
+
+	BotCorrectProb float64 // 🏆 simulyatsion raqib to'g'ri javob ehtimoli (0..1)
 }
 
 func NewEngine(hub *ws.Hub, store state.Store, registry *Registry, persister Persister, logger *slog.Logger) *Engine {
 	return &Engine{
-		hub:       hub,
-		store:     store,
-		registry:  registry,
-		persister: persister,
-		logger:    logger,
-		Countdown: 5,
-		RevealGap: 2 * time.Second,
+		hub:            hub,
+		store:          store,
+		registry:       registry,
+		persister:      persister,
+		logger:         logger,
+		Countdown:      5,
+		RevealGap:      2 * time.Second,
+		BotCorrectProb: 0.65, // o'rta qiyinlik
 	}
 }
 
@@ -82,6 +85,9 @@ func (e *Engine) CreateRoom(c *ws.Client, d ws.RoomCreateData) {
 		},
 	}
 	e.store.Create(room)
+	if wantsBot(mode, room.Config.Opponent) { // 🏆 raqib bot — lobby'da ko'rinadi
+		addBot(room)
+	}
 
 	c.SetIdentity(userID, d.DisplayName)
 	e.hub.Join(c, sessionID)
@@ -365,6 +371,7 @@ func (e *Engine) runSync(room *state.Room) {
 		room.Mu.Unlock()
 
 		e.hub.BroadcastMsg(sessionID, ws.SQuestionShow, e.showPayload(q, idx, total, deadline))
+		e.scheduleBots(room, q, deadline) // 🏆 botlar deadline ichida javob beradi
 
 		// Deadline'gacha kutish. TODO: hamma javob bersa erta o'tish (early-advance).
 		time.Sleep(time.Until(time.UnixMilli(deadline)))
@@ -552,6 +559,65 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 		entries[i].Rank = i + 1
 	}
 	return entries
+}
+
+// wantsBot — raqib bot/mixed va rejim sinxron (per-player time_attack hozircha botsiz).
+func wantsBot(mode, opponent string) bool {
+	if opponent != "bot" && opponent != "mixed" {
+		return false
+	}
+	switch mode {
+	case "classic", "survival", "team":
+		return true
+	}
+	return false
+}
+
+// addBot — xonaga simulyatsion raqib qo'shadi (Persistent emas → DB'ga yozilmaydi).
+func addBot(room *state.Room) {
+	id := uuid.NewString()
+	room.Players[id] = &state.Player{
+		UserID: id, Name: "🤖 Bot", Connected: true, IsBot: true, JoinedAt: nowMs(),
+	}
+}
+
+// scheduleBots — har bot uchun deadline ichida tasodifiy vaqtda ehtimoliy javob
+// rejalashtiradi (time.AfterFunc). Bot to'g'ri javobni p ehtimol bilan beradi;
+// to'g'ri optionId shart emas — natija (correct bool) bevosita OnAnswer'ga uzatiladi.
+func (e *Engine) scheduleBots(room *state.Room, q *state.LiveQuestion, deadline int64) {
+	room.Mu.RLock()
+	mode := room.Config.Mode
+	askedAt := q.AskedAt
+	var botIDs []string
+	for id, p := range room.Players {
+		if p.IsBot && !p.Eliminated {
+			botIDs = append(botIDs, id)
+		}
+	}
+	room.Mu.RUnlock()
+
+	span := deadline - askedAt
+	if span <= 0 {
+		return
+	}
+	for _, id := range botIDs {
+		botID := id
+		delay := time.Duration(float64(span)*(0.2+0.6*rand.Float64())) * time.Millisecond
+		correct := rand.Float64() < e.BotCorrectProb
+		time.AfterFunc(delay, func() {
+			room.Mu.Lock()
+			defer room.Mu.Unlock()
+			if room.Status != state.Running || q.Answered[botID] {
+				return
+			}
+			p := room.Players[botID]
+			if p == nil || p.Eliminated {
+				return
+			}
+			q.Answered[botID] = true
+			modes.For(mode).OnAnswer(p, q, correct, nowMs())
+		})
+	}
 }
 
 // assignTeams — o'yinchilarni 2 jamoaga balanslab taqsimlaydi (qo'shilish tartibida
