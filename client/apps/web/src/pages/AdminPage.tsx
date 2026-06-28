@@ -8,17 +8,23 @@ import { Card } from "../components/ui/card";
 
 const OPT_IDS = ["a", "b", "c", "d"];
 
-const QTYPES = ["mcq", "true_false", "numeric", "ordering", "cloze", "match", "categorize"];
+const QTYPES = ["mcq", "true_false", "numeric", "type_answer", "anagram", "ordering", "cloze", "match", "categorize"];
 const BULK_TYPES = ["ordering", "cloze", "match", "categorize"];
+// type_answer/anagram — bitta textarea: qabul qilinadigan javoblar (sinonim) ro'yxati.
+const TEXT_TYPES = ["type_answer", "anagram"];
 
 // bo'sh bo'lmagan, trim qilingan qatorlar
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+// vergul yoki yangi qator bilan ajratilgan qabul qilinadigan javoblar
+const accepted = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
 
 const bulkHint: Record<string, string> = {
   ordering: "Elementlar TO'G'RI tartibda, har biri yangi qatorda.",
   cloze: "Savol matniga ___ qo'ying. Bu yerga har bo'shliq javobi (sinonim = vergul), yangi qatorda.",
   match: "Har qatorda: chap = o'ng (masalan: cat = mushuk).",
   categorize: "Har qatorda: element = Toifa (masalan: olma = Meva).",
+  type_answer: "Qabul qilinadigan javoblar (sinonim), vergul yoki yangi qator bilan.",
+  anagram: "Harflarni promptga yozing (masalan: T-E-N-W). Bu yerga to'g'ri so'z(lar), vergul bilan.",
 };
 
 export function AdminPage() {
@@ -99,6 +105,8 @@ export function AdminPage() {
       body.correct = { value: tfValue };
     } else if (type === "numeric") {
       body.correct = { value: Number(numValue), tolerance: 0 };
+    } else if (TEXT_TYPES.includes(type)) {
+      body.correct = { accepted: accepted(bulk) };
     } else if (type === "ordering") {
       const items = lines(bulk);
       body.options = items.map((tx, i) => ({ id: `o${i + 1}`, text: tx }));
@@ -231,7 +239,7 @@ export function AdminPage() {
         )}
         {type === "numeric" && <Input type="number" value={numValue} onChange={(e) => setNumValue(e.target.value)} placeholder="To'g'ri javob (raqam)" />}
 
-        {BULK_TYPES.includes(type) && (
+        {(BULK_TYPES.includes(type) || TEXT_TYPES.includes(type)) && (
           <div className="space-y-1">
             <textarea
               value={bulk}
@@ -245,7 +253,7 @@ export function AdminPage() {
         )}
 
         <Input value={expl} onChange={(e) => setExpl(e.target.value)} placeholder="Izoh (ixtiyoriy)" />
-        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt || (BULK_TYPES.includes(type) && !bulk.trim())}>
+        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt || ((BULK_TYPES.includes(type) || TEXT_TYPES.includes(type)) && !bulk.trim())}>
           Qo'shish
         </Button>
         {msg && <p className="text-center text-sm text-indigo-600">{msg}</p>}

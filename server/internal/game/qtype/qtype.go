@@ -22,7 +22,8 @@ func For(t string) QuestionType {
 		return trueFalse{}
 	case "numeric":
 		return numeric{}
-	case "type_answer", "fill_blank":
+	case "type_answer", "fill_blank", "anagram":
+		// anagram — aralashtirilgan harflar prompt'da; foydalanuvchi so'zni yozadi.
 		return typeAnswer{}
 	case "multi_select":
 		return multiSelect{}

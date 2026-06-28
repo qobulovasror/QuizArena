@@ -24,6 +24,8 @@ func TestValidate(t *testing.T) {
 		{"numeric tolerancedan tashqari", "numeric", map[string]float64{"value": 13}, map[string]float64{"value": 12, "tolerance": 0.5}, false},
 		{"type_answer normalize", "type_answer", map[string]string{"text": "  WeNt "}, map[string][]string{"accepted": {"went"}}, true},
 		{"type_answer xato", "type_answer", map[string]string{"text": "goed"}, map[string][]string{"accepted": {"went"}}, false},
+		{"anagram to'g'ri", "anagram", map[string]string{"text": "went"}, map[string][]string{"accepted": {"went"}}, true},
+		{"anagram xato", "anagram", map[string]string{"text": "tewn"}, map[string][]string{"accepted": {"went"}}, false},
 		{"multi_select tartibsiz", "multi_select", map[string][]string{"optionIds": {"b", "a"}}, map[string][]string{"optionIds": {"a", "b"}}, true},
 		{"multi_select kam", "multi_select", map[string][]string{"optionIds": {"a"}}, map[string][]string{"optionIds": {"a", "b"}}, false},
 

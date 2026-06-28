@@ -87,6 +87,7 @@ oshkor bo'lmaydi. Javob va to'g'ri javob shakli (1-bosqich `mcq` uchun):
 | `true_false` | — | `{ value: true|false }` | `{ value }` |
 | `multi_select` | `[{id,text}]` | `{ optionIds: [] }` | `{ optionIds: [] }` |
 | `type_answer`/`fill_blank` | — | `{ text }` | `{ accepted: [] }` |
+| `anagram` | — | `{ text }` | `{ accepted: [] }` |
 | `numeric` | — | `{ value }` | `{ value, tolerance? }` |
 | `match` | `[{id,text}]` (chap) | `{ pairs: { leftId: rightId } }` | `{ pairs: { leftId: rightId } }` |
 | `ordering` | `[{id,text}]` (aralash) | `{ order: [id,…] }` | `{ order: [id,…] }` |
@@ -95,6 +96,7 @@ oshkor bo'lmaydi. Javob va to'g'ri javob shakli (1-bosqich `mcq` uchun):
 
 > `match`/`categorize` — to'la moslik (har juft/element to'g'ri); `ordering` — aniq tartib;
 > `cloze` — har bo'shliq mos `accepted` ro'yxatida (normalize: trim + lowercase).
+> `anagram` — `type_answer` kabi baholanadi; aralashtirilgan harflar `prompt` ichida beriladi.
 > Boshqa turlar (§5 katalog) keyingi bosqichlarda shu jadvalga qo'shiladi.
 
 **Render uchun qo'shimcha (`question:show`):**

@@ -198,7 +198,7 @@ func seedProgramming(categoryID uuid.UUID) {
 	log.Printf("✓ programming savollar: %d", len(questions))
 }
 
-// seedTypes — har yangi turdan bittadan namuna (ordering/cloze/match/categorize).
+// seedTypes — har yangi turdan bittadan namuna (ordering/cloze/match/categorize/anagram/type_answer).
 func seedTypes(categoryID uuid.UUID) {
 	n, err := q.CountQuestionsByCategory(ctx, categoryID)
 	if err != nil {
@@ -220,6 +220,8 @@ func seedTypes(categoryID uuid.UUID) {
 			[][2]string{{"i1", "olma"}, {"i2", "mushuk"}, {"i3", "nok"}},
 			[][2]string{{"c1", "Meva"}, {"c2", "Hayvon"}},
 			map[string]string{"i1": "c1", "i2": "c2", "i3": "c1"}),
+		anagramQ("Harflardan so'z tuz: T-E-N-W", "Aralash harflar: went.", []string{"went"}),
+		typeAnswerQ("«go» fe'lining 2-shakli?", "go → went.", []string{"went"}),
 	}
 	for _, p := range questions {
 		p.CategoryID = categoryID
@@ -270,6 +272,20 @@ func categorizeQ(prompt, expl string, items, cats [][2]string, assign map[string
 	mb, _ := json.Marshal(map[string]any{"targets": optsFrom(cats)})
 	e := expl
 	return store.CreateQuestionParams{Type: "categorize", Prompt: prompt, Options: ob, Correct: cb, Meta: mb, Explanation: &e, Difficulty: 1}
+}
+
+// typeAnswerQ — matnli javob: correct = {accepted:[...]}; options yo'q.
+func typeAnswerQ(prompt, expl string, accepted []string) store.CreateQuestionParams {
+	cb, _ := json.Marshal(map[string][]string{"accepted": accepted})
+	e := expl
+	return store.CreateQuestionParams{Type: "type_answer", Prompt: prompt, Correct: cb, Explanation: &e, Difficulty: 1}
+}
+
+// anagramQ — aralash harflar prompt'da; baholanishi type_answer kabi (accepted ro'yxati).
+func anagramQ(prompt, expl string, accepted []string) store.CreateQuestionParams {
+	cb, _ := json.Marshal(map[string][]string{"accepted": accepted})
+	e := expl
+	return store.CreateQuestionParams{Type: "anagram", Prompt: prompt, Correct: cb, Explanation: &e, Difficulty: 1}
 }
 
 func mcqQ(prompt, expl string, opts [][2]string, correctID string) store.CreateQuestionParams {

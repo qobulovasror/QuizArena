@@ -81,11 +81,16 @@ function isMine(type: string, mine: Choice | undefined, correct: unknown): boole
     pairs?: Record<string, string>;
     assign?: Record<string, string>;
     blanks?: { accepted: string[] }[];
+    accepted?: string[];
   };
   const norm = (s: string) => s.trim().toLowerCase();
   switch (type) {
     case "numeric":
       return Number(mine.value) === Number(c.value);
+    case "type_answer":
+    case "fill_blank":
+    case "anagram":
+      return (c.accepted ?? []).some((x) => norm(x) === norm(mine.text ?? ""));
     case "true_false":
       return mine.value === c.value;
     case "ordering": {
@@ -196,6 +201,11 @@ function QuestionBody({
     return <NumericBody reveal={reveal} myChoice={myChoice} disabled={disabled} onAnswer={onAnswer} />;
   }
 
+  // type_answer/fill_blank/anagram — matn yoziladi (anagram: harflar prompt'da).
+  if (["type_answer", "fill_blank", "anagram"].includes(question.type)) {
+    return <TextBody reveal={reveal} myChoice={myChoice} disabled={disabled} onAnswer={onAnswer} />;
+  }
+
   if (question.type === "ordering") {
     return <OrderingBody items={question.options ?? []} disabled={disabled} onAnswer={onAnswer} />;
   }
@@ -263,6 +273,41 @@ function NumericBody({
         <p className="text-center text-sm text-green-700">{t("play.correctAnswer", { val: correct.value })}</p>
       ) : (
         <Button className="w-full" disabled={disabled || val === ""} onClick={() => onAnswer({ value: Number(val) })}>
+          {t("play.submitAnswer")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// TextBody — type_answer/fill_blank/anagram uchun matnli javob (NumericBody uslubida).
+function TextBody({
+  reveal,
+  myChoice,
+  disabled,
+  onAnswer,
+}: {
+  reveal: QuestionRevealData | null;
+  myChoice: Choice | undefined;
+  disabled: boolean;
+  onAnswer: (choice: Choice) => void;
+}) {
+  const { t } = useTranslation();
+  const [val, setVal] = useState("");
+  const correct = (reveal?.correct ?? {}) as { accepted?: string[] };
+  return (
+    <div className="space-y-3">
+      <Input
+        value={reveal && myChoice ? String(myChoice.text ?? "") : val}
+        disabled={disabled}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder={t("play.enterAnswer")}
+        className="text-center text-lg"
+      />
+      {reveal ? (
+        <p className="text-center text-sm text-green-700">{t("play.correctAnswer", { val: (correct.accepted ?? []).join(" / ") })}</p>
+      ) : (
+        <Button className="w-full" disabled={disabled || val.trim() === ""} onClick={() => onAnswer({ text: val })}>
           {t("play.submitAnswer")}
         </Button>
       )}
