@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -96,9 +97,28 @@ func (h *tournamentHandler) play(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]assessQ, 0, len(rows))
 	for _, q := range rows {
-		out = append(out, assessQ{QuestionID: q.ID.String(), Type: q.Type, Prompt: q.Prompt, Options: q.Options})
+		// Variantlarni serverda aralashtiramiz — tartibga-sezgir turlarda (ordering)
+		// DB tartibi to'g'ri javobni oshkor qilmasligi uchun.
+		out = append(out, assessQ{QuestionID: q.ID.String(), Type: q.Type, Prompt: q.Prompt, Options: shuffleOptions(q.Options)})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// shuffleOptions — variant massivini (opaque {id,text}) aralashtiradi.
+func shuffleOptions(raw []byte) []byte {
+	if len(raw) == 0 {
+		return raw
+	}
+	var opts []json.RawMessage
+	if json.Unmarshal(raw, &opts) != nil || len(opts) < 2 {
+		return raw
+	}
+	rand.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
+	out, err := json.Marshal(opts)
+	if err != nil {
+		return raw
+	}
+	return out
 }
 
 // submit — javoblarni server-side baholaydi va eng yaxshi ballni saqlaydi.
@@ -133,16 +153,24 @@ func (h *tournamentHandler) submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	correct := 0
+	// Anti-cheat: har savol bir marta, FAQAT turnir sohasidagi savollar, eng ko'pi
+	// bilan questionCount tasi hisoblanadi (boshqa soha/takror ID bilan ball shishirib bo'lmaydi).
+	seen := map[uuid.UUID]bool{}
+	correct, counted := 0, 0
 	for _, a := range req.Answers {
+		if counted >= int(t.QuestionCount) {
+			break
+		}
 		qid, err := uuid.Parse(a.QuestionID)
-		if err != nil {
+		if err != nil || seen[qid] {
 			continue
 		}
-		q, err := h.q.GetQuestionByID(r.Context(), qid)
+		q, err := h.q.GetQuestionInSubject(r.Context(), store.GetQuestionInSubjectParams{ID: qid, SubjectID: t.SubjectID})
 		if err != nil {
-			continue
+			continue // boshqa soha yoki mavjud emas — e'tiborsiz
 		}
+		seen[qid] = true
+		counted++
 		if qtype.For(q.Type).Validate(a.Choice, q.Correct) {
 			correct++
 		}

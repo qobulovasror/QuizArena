@@ -94,3 +94,12 @@ export interface ErrorData {
   code: string;
   message: string;
 }
+
+// 🏆 Matchmaking (server→client). C→S (match:queue/cancel) store orqali inline yuboriladi.
+export interface MatchQueuedData {
+  subjectId: string;
+}
+export interface MatchFoundData {
+  sessionId: string;
+  vsBot: boolean;
+}

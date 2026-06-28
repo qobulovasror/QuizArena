@@ -22,3 +22,8 @@ JOIN categories c ON c.id = q.category_id
 WHERE c.subject_id = $1
 ORDER BY random()
 LIMIT $2;
+
+-- name: GetQuestionInSubject :one
+SELECT q.* FROM questions q
+JOIN categories c ON c.id = q.category_id
+WHERE q.id = $1 AND c.subject_id = $2;

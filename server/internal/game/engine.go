@@ -659,7 +659,8 @@ func (e *Engine) scheduleBots(room *state.Room, q *state.LiveQuestion, deadline 
 		time.AfterFunc(delay, func() {
 			room.Mu.Lock()
 			defer room.Mu.Unlock()
-			if room.Status != state.Running || q.Answered[botID] {
+			// Deadline o'tib ketgan bo'lsa (reveal bo'lgan) — kech javobni hisoblamaymiz.
+			if room.Status != state.Running || q.Answered[botID] || nowMs() > q.Deadline {
 				return
 			}
 			p := room.Players[botID]
