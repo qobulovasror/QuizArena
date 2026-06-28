@@ -16,6 +16,7 @@ export interface Player {
   connected: boolean;
   isBot?: boolean;
   eliminated?: boolean;
+  team?: string;
 }
 
 export interface RoomConfig {
@@ -37,6 +38,14 @@ export interface LeaderboardEntry {
   correctCnt: number;
   rank: number;
   eliminated?: boolean;
+  team?: string;
+}
+
+export interface TeamStanding {
+  team: string;
+  score: number;
+  correctCnt: number;
+  rank: number;
 }
 
 export interface RoomStateData {
@@ -72,10 +81,12 @@ export interface QuestionRevealData {
   correct: { optionId?: string } | unknown;
   explanation?: string;
   leaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[];
 }
 
 export interface GameOverData {
   finalLeaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[];
 }
 
 export interface ErrorData {

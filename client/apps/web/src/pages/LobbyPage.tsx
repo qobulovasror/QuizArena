@@ -11,9 +11,10 @@ const fallback = [
   { slug: "english", name: "Ingliz tili", icon: "📘" },
   { slug: "math", name: "Matematika", icon: "🔢" },
   { slug: "general", name: "Umumiy bilim", icon: "🌍" },
+  { slug: "programming", name: "Dasturlash", icon: "💻" },
 ];
 
-const modeIds = ["classic", "survival"];
+const modeIds = ["classic", "survival", "time_attack", "team"];
 
 export function LobbyPage() {
   const { t } = useTranslation();

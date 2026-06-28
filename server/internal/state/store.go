@@ -53,8 +53,21 @@ type Player struct {
 	Connected  bool
 	IsBot      bool
 	JoinedAt   int64
-	Persistent bool // tokenli (haqiqiy users yozuvi) → natija DB'ga yoziladi
-	Eliminated bool // survival rejimi: xato javobdan keyin o'yindan chiqdi
+	Persistent bool   // tokenli (haqiqiy users yozuvi) → natija DB'ga yoziladi
+	Eliminated bool   // survival rejimi: xato javobdan keyin o'yindan chiqdi
+	Team       string // team rejimi: jamoa belgisi ("A"/"B"), StartGame'da tayinlanadi
+	TaIdx      int    // time_attack: o'yinchining joriy savol indeksi (per-player oqim)
+	TaDone     bool   // time_attack: barcha savollarga javob berdi
+}
+
+// AnswerEvent — bitta o'yinchi javobi, answers_log audit uchun yig'iladi.
+// `Given` — xom tanlov; `QuestionID` DB-savol bo'lsa UUID (generativ savolda emas).
+type AnswerEvent struct {
+	UserID     string
+	QuestionID string
+	Given      json.RawMessage
+	IsCorrect  bool
+	TimeMs     int
 }
 
 type Config struct {
@@ -76,9 +89,11 @@ type Room struct {
 	Status     Status
 	Config     Config
 	Players    map[string]*Player
-	Questions  []*LiveQuestion
-	CurrentIdx int
-	StartedAt  time.Time
+	Questions      []*LiveQuestion
+	CurrentIdx     int
+	StartedAt      time.Time
+	GlobalDeadline int64         // time_attack: butun o'yin uchun yagona deadline (epoch ms)
+	Answers        []AnswerEvent // o'yin davomida yig'iladi, tugagach answers_log'ga yoziladi
 }
 
 // Store — jonli xonalar ombori interfeysi.

@@ -55,9 +55,9 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 | `game:countdown` | `{ secondsLeft }` | Boshlanish sanog'i (5…1). |
 | `question:show` | `{ index, total, type, prompt, options?, deadlineTs }` | Savol. **`correct` YO'Q.** `deadlineTs` — server epoch **ms**. |
 | `answer:ack` | `{ index, accepted }` | *Ixtiyoriy.* Javob qabul qilingani (to'g'rilikni **oshkor qilmaydi**). |
-| `question:reveal` | `{ index, correct, explanation?, leaderboard[] }` | Deadline tugagach: to'g'ri javob + izoh + reyting. |
+| `question:reveal` | `{ index, correct, explanation?, leaderboard[], teams? }` | Deadline tugagach: to'g'ri javob + izoh + reyting. `teams` — faqat team rejimi. |
 | `player:scored` | `{ leaderboard[] }` | *Ixtiyoriy* jonli reyting yangilanishi. |
-| `game:over` | `{ finalLeaderboard[] }` | O'yin tugadi. |
+| `game:over` | `{ finalLeaderboard[], teams? }` | O'yin tugadi. `teams` — faqat team rejimi. |
 | `error` | `{ code, message }` | Xato (§7 kodlari). |
 
 ---
@@ -65,10 +65,11 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 ## 5. Umumiy tuzilmalar
 
 ```
-Player           { userId, name, score, connected, isBot?, eliminated? }
+Player           { userId, name, score, connected, isBot?, eliminated?, team? }
 RoomConfig       { subjectId, mode, questionCount, timePerQ }
 Option           { id, text }              // id — opaque (server shuffle qiladi)
-LeaderboardEntry { userId, name, score, correctCnt, rank, eliminated? }   // eliminated: survival
+LeaderboardEntry { userId, name, score, correctCnt, rank, eliminated?, team? }   // eliminated: survival, team: team rejimi
+TeamStanding     { team, score, correctCnt, rank }    // team rejimi yig'indisi
 ```
 
 ## 6. Savol turiga qarab `choice` / `correct` shakli
@@ -83,7 +84,13 @@ oshkor bo'lmaydi. Javob va to'g'ri javob shakli (1-bosqich `mcq` uchun):
 | `multi_select` | `[{id,text}]` | `{ optionIds: [] }` | `{ optionIds: [] }` |
 | `type_answer`/`fill_blank` | — | `{ text }` | `{ accepted: [] }` |
 | `numeric` | — | `{ value }` | `{ value, tolerance? }` |
+| `match` | `[{id,text}]` (chap) | `{ pairs: { leftId: rightId } }` | `{ pairs: { leftId: rightId } }` |
+| `ordering` | `[{id,text}]` (aralash) | `{ order: [id,…] }` | `{ order: [id,…] }` |
+| `categorize` | `[{id,text}]` (elementlar) | `{ assign: { itemId: catId } }` | `{ assign: { itemId: catId } }` |
+| `cloze` | — | `{ blanks: [text,…] }` | `{ blanks: [ {accepted:[…]}, … ] }` |
 
+> `match`/`categorize` — to'la moslik (har juft/element to'g'ri); `ordering` — aniq tartib;
+> `cloze` — har bo'shliq mos `accepted` ro'yxatida (normalize: trim + lowercase).
 > Boshqa turlar (§5 katalog) keyingi bosqichlarda shu jadvalga qo'shiladi.
 > Server `choice` ni **xom** (`json.RawMessage`/`unknown`) qabul qiladi va tur strategiyasi
 > orqali tekshiradi.
@@ -121,6 +128,18 @@ host: game:start ──► game:countdown (5..1)
    └────────────────────────────────────────────────────────────────┘  × N
 server ► game:over { finalLeaderboard }
 ```
+
+### 8.1 Rejimga xos oqim farqlari
+
+- **`classic` / `team`** — yuqoridagi sinxron oqim. `team`'da o'yinchilar StartGame'da
+  2 jamoaga (A/B) balanslab taqsimlanadi; ball individ, lekin `question:reveal` va
+  `game:over` qo'shimcha `teams[]` (jamoa yig'indisi) yuboradi. `Player.team` to'ldiriladi.
+- **`survival`** — sinxron, lekin xato javob o'yinchini chiqaradi (`eliminated`); bittadan
+  kam tirik qolsa o'yin erta tugaydi.
+- **`time_attack`** — **per-player oqim**: har o'yinchi o'z sur'atida. `game:countdown`dan
+  so'ng har kim **o'z** `question:show`'ini oladi (`deadlineTs` — butun o'yin uchun yagona).
+  Har `answer:submit` → `answer:ack` + **darhol keyingi** `question:show` (reveal **yo'q**).
+  Savollar tugaganda yoki yagona deadline kelganda `game:over`. Ball = to'g'ri javob soni.
 
 ## 9. Reconnect
 

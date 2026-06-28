@@ -43,6 +43,7 @@ export interface Player {
   connected: boolean;
   isBot?: boolean;
   eliminated?: boolean;
+  team?: string; // team rejimi
 }
 
 export interface RoomConfig {
@@ -64,15 +65,28 @@ export interface LeaderboardEntry {
   correctCnt: number;
   rank: number;
   eliminated?: boolean;
+  team?: string; // team rejimi
+}
+
+// TeamStanding — jamoa yig'indisi (team rejimi; reveal/over'da).
+export interface TeamStanding {
+  team: string;
+  score: number;
+  correctCnt: number;
+  rank: number;
 }
 
 // `choice` / `correct` savol turiga qarab o'zgaradi (README §6).
 export type AnswerChoice =
-  | { optionId: string }            // mcq
-  | { value: boolean }              // true_false
-  | { optionIds: string[] }         // multi_select
-  | { text: string }                // type_answer / fill_blank
-  | { value: number };              // numeric
+  | { optionId: string }                        // mcq
+  | { value: boolean }                          // true_false
+  | { optionIds: string[] }                     // multi_select
+  | { text: string }                            // type_answer / fill_blank
+  | { value: number }                           // numeric
+  | { pairs: Record<string, string> }           // match
+  | { assign: Record<string, string> }          // categorize
+  | { order: string[] }                         // ordering
+  | { blanks: string[] };                       // cloze
 
 // ---- Client → Server yuklar ----
 export interface RoomCreateData {
@@ -131,12 +145,14 @@ export interface QuestionRevealData {
   correct: unknown; // tur bo'yicha shakl (README §6)
   explanation?: string;
   leaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[]; // team rejimi
 }
 export interface PlayerScoredData {
   leaderboard: LeaderboardEntry[];
 }
 export interface GameOverData {
   finalLeaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[]; // team rejimi
 }
 
 export type ErrorCode =

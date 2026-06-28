@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type GameRecord struct {
 	StartedAt     time.Time
 	FinishedAt    time.Time
 	Results       []ResultRecord
+	Answers       []AnswerRecord
 }
 
 type ResultRecord struct {
@@ -29,4 +31,13 @@ type ResultRecord struct {
 	Score      float64
 	CorrectCnt int
 	Rank       int
+}
+
+// AnswerRecord — answers_log uchun bitta javob (analitika / anti-cheat audit).
+type AnswerRecord struct {
+	UserID     string
+	QuestionID string
+	Given      json.RawMessage
+	IsCorrect  bool
+	TimeMs     int
 }

@@ -31,6 +31,9 @@ export function PlayPage() {
   const revealed = !!reveal && reveal.index === question.index;
   const answered = answeredIndex === question.index;
   const timePerQ = room?.config.timePerQ ?? 15;
+  // time_attack — yagona vaqt byudjeti (timePerQ × savol soni); aks holda har savol vaqti.
+  const totalMs =
+    (room?.config.mode === "time_attack" ? timePerQ * (room?.config.questionCount ?? 1) : timePerQ) * 1000;
   const myChoice: Choice | undefined = myAnswer?.index === question.index ? myAnswer.choice : undefined;
   const iWasRight = revealed ? isMine(question.type, myChoice, reveal!.correct) : false;
 
@@ -42,7 +45,7 @@ export function PlayPage() {
         <div className="rounded-lg bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-600">{t("play.eliminated")}</div>
       )}
 
-      {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={timePerQ * 1000} />}
+      {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={totalMs} />}
 
       <Card>
         <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>

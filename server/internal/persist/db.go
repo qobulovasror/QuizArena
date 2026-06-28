@@ -61,5 +61,29 @@ func (d *DB) SaveGame(ctx context.Context, rec game.GameRecord) error {
 			return fmt.Errorf("natija yozish (%s): %w", r.UserID, err)
 		}
 	}
+
+	// answers_log — analitika / anti-cheat audit. question_id FK questions(id)
+	// bo'lgani uchun faqat DB-bankdagi savollar (general provider) yoziladi;
+	// generativ savollar (UUID emas) o'tkazib yuboriladi.
+	for _, a := range rec.Answers {
+		uid, err := uuid.Parse(a.UserID)
+		if err != nil {
+			continue
+		}
+		qid, err := uuid.Parse(a.QuestionID)
+		if err != nil {
+			continue // generativ savol — DB'da yo'q
+		}
+		if err := d.q.InsertAnswerLog(ctx, store.InsertAnswerLogParams{
+			SessionID:  sess.ID,
+			UserID:     uid,
+			QuestionID: qid,
+			Given:      a.Given,
+			IsCorrect:  a.IsCorrect,
+			TimeMs:     int32(a.TimeMs),
+		}); err != nil {
+			return fmt.Errorf("javob logini yozish: %w", err)
+		}
+	}
 	return nil
 }

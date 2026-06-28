@@ -48,6 +48,7 @@ type Player struct {
 	Connected  bool    `json:"connected"`
 	IsBot      bool    `json:"isBot,omitempty"`
 	Eliminated bool    `json:"eliminated,omitempty"`
+	Team       string  `json:"team,omitempty"` // team rejimi
 }
 
 type RoomConfig struct {
@@ -70,6 +71,15 @@ type LeaderboardEntry struct {
 	CorrectCnt int     `json:"correctCnt"`
 	Rank       int     `json:"rank"`
 	Eliminated bool    `json:"eliminated,omitempty"`
+	Team       string  `json:"team,omitempty"` // team rejimi
+}
+
+// TeamStanding — jamoa yig'indisi (team rejimi; reveal/over'da yuboriladi).
+type TeamStanding struct {
+	Team       string  `json:"team"`
+	Score      float64 `json:"score"`
+	CorrectCnt int     `json:"correctCnt"`
+	Rank       int     `json:"rank"`
 }
 
 // ---- Client → Server yuklar ----
@@ -140,6 +150,7 @@ type QuestionRevealData struct {
 	Correct     json.RawMessage    `json:"correct"` // tur bo'yicha shakl
 	Explanation string             `json:"explanation,omitempty"`
 	Leaderboard []LeaderboardEntry `json:"leaderboard"`
+	Teams       []TeamStanding     `json:"teams,omitempty"` // team rejimi
 }
 
 type PlayerScoredData struct {
@@ -148,6 +159,7 @@ type PlayerScoredData struct {
 
 type GameOverData struct {
 	FinalLeaderboard []LeaderboardEntry `json:"finalLeaderboard"`
+	Teams            []TeamStanding     `json:"teams,omitempty"` // team rejimi
 }
 
 type ErrorData struct {

@@ -79,6 +79,28 @@ func (h *Hub) BroadcastMsg(room string, t MsgType, data any) {
 	h.Broadcast(room, payload)
 }
 
+// SendToUser — xonadagi muayyan userID'li klient(lar)ga xabar yuboradi.
+// time_attack per-player oqimi uchun (har o'yinchiga o'z savoli).
+func (h *Hub) SendToUser(room, userID string, t MsgType, data any) {
+	payload, err := marshalEnvelope(t, data)
+	if err != nil {
+		h.logger.Error("ws: sendToUser marshal", "err", err, "type", t)
+		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.rooms[room] {
+		if c.userID != userID {
+			continue
+		}
+		select {
+		case c.send <- payload:
+		default:
+			h.logger.Warn("ws: sekin iste'molchi, xabar tashlandi", "client", c.id, "room", room)
+		}
+	}
+}
+
 // Players — xonadagi klientlarning snapshot ro'yxati.
 func (h *Hub) Players(room string) []Player {
 	h.mu.RLock()

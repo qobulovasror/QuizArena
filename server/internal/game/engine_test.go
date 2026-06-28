@@ -53,13 +53,18 @@ func jraw(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 
 // correctOptionID — server holatidan birinchi savolning to'g'ri optionId'sini oladi (oq-quti).
 func correctOptionID(t *testing.T, store *state.MemStore, sessionID string) string {
+	return correctOptionIDAt(t, store, sessionID, 0)
+}
+
+// correctOptionIDAt — idx'inchi savolning to'g'ri optionId'si (time_attack uchun).
+func correctOptionIDAt(t *testing.T, store *state.MemStore, sessionID string, idx int) string {
 	t.Helper()
 	room, ok := store.Get(sessionID)
 	if !ok {
 		t.Fatal("xona topilmadi")
 	}
 	room.Mu.RLock()
-	raw := room.Questions[0].Correct
+	raw := room.Questions[idx].Correct
 	room.Mu.RUnlock()
 	var cc struct {
 		OptionID string `json:"optionId"`
@@ -138,6 +143,78 @@ func TestFullGameFlow(t *testing.T) {
 	_ = json.Unmarshal(over.Data, &ov)
 	if len(ov.FinalLeaderboard) != 1 || ov.FinalLeaderboard[0].CorrectCnt != 1 {
 		t.Fatalf("correctCnt 1 kutilgan: %+v", ov.FinalLeaderboard)
+	}
+}
+
+// time_attack: per-player oqim — javobdan keyin DARHOL keyingi savol (reveal yo'q),
+// hamma tugagach game:over.
+func TestTimeAttackFlow(t *testing.T) {
+	e, store := newTestEngine()
+	conn := dialWS(t, e)
+
+	send(t, conn, ws.CRoomCreate, ws.RoomCreateData{
+		SubjectID: "x", Mode: "time_attack", QuestionCount: 2, TimePerQ: 1, DisplayName: "Host",
+	})
+	joined := expect(t, conn, ws.SRoomJoined)
+	var rj ws.RoomJoinedData
+	_ = json.Unmarshal(joined.Data, &rj)
+	expect(t, conn, ws.SRoomState)
+
+	send(t, conn, ws.CGameStart, struct{}{})
+	expect(t, conn, ws.SRoomState) // running
+
+	show0 := expect(t, conn, ws.SQuestionShow)
+	var q0 ws.QuestionShowData
+	_ = json.Unmarshal(show0.Data, &q0)
+	if q0.Index != 0 {
+		t.Fatalf("birinchi savol index 0 kutilgan: %d", q0.Index)
+	}
+
+	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{
+		QuestionIndex: 0, Choice: jraw(map[string]string{"optionId": correctOptionIDAt(t, store, rj.SessionID, 0)}),
+	})
+	expect(t, conn, ws.SAnswerAck)
+	show1 := expect(t, conn, ws.SQuestionShow) // reveal'siz darhol keyingi savol
+	var q1 ws.QuestionShowData
+	_ = json.Unmarshal(show1.Data, &q1)
+	if q1.Index != 1 {
+		t.Fatalf("keyingi savol index 1 kutilgan: %d", q1.Index)
+	}
+
+	send(t, conn, ws.CAnswerSubmit, ws.AnswerSubmitData{
+		QuestionIndex: 1, Choice: jraw(map[string]string{"optionId": correctOptionIDAt(t, store, rj.SessionID, 1)}),
+	})
+	expect(t, conn, ws.SAnswerAck)
+
+	over := expect(t, conn, ws.SGameOver) // hamma tugadi → erta yakun
+	var ov ws.GameOverData
+	_ = json.Unmarshal(over.Data, &ov)
+	if len(ov.FinalLeaderboard) != 1 || ov.FinalLeaderboard[0].CorrectCnt != 2 {
+		t.Fatalf("2 to'g'ri javob kutilgan: %+v", ov.FinalLeaderboard)
+	}
+}
+
+// teamStandings: jamoa yig'indisi to'g'ri hisoblanadi va saralanadi.
+func TestTeamStandings(t *testing.T) {
+	e, _ := newTestEngine()
+	room := &state.Room{
+		Config: state.Config{Mode: "team"},
+		Players: map[string]*state.Player{
+			"a": {Team: "A", Score: 100, CorrectCnt: 1},
+			"b": {Team: "B", Score: 250, CorrectCnt: 2},
+			"c": {Team: "A", Score: 200, CorrectCnt: 2},
+		},
+	}
+	ts := e.teamStandings(room)
+	if len(ts) != 2 {
+		t.Fatalf("2 jamoa kutilgan: %+v", ts)
+	}
+	if ts[0].Team != "A" || ts[0].Score != 300 || ts[0].Rank != 1 { // A: 100+200=300 > B: 250
+		t.Fatalf("A jamoa 300 ball rank 1 kutilgan: %+v", ts[0])
+	}
+	room.Config.Mode = "classic"
+	if e.teamStandings(room) != nil {
+		t.Fatal("team bo'lmagan rejimda nil kutilgan")
 	}
 }
 
