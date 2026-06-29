@@ -75,8 +75,8 @@ Tartib **qiymat ÷ xavf ÷ bog'liqlik** bo'yicha. Har band — bitta branch + bi
 8. **Bot kengaytmasi**: qiyinlik darajalari + `time_attack` bot.
 
 ### Tier 3 — Arxitektura & platformalar
-9. **`packages/core` ajratish** (arxitektura qarzi) — RN/Telegram'ni ochadi.
-10. **`apps/telegram`** wrapper → **React Native** ilova (`apps/native`).
+9. ✅ **`packages/core` ajratish** — bajarildi (core endi platforma-agnostik: `configureCore`, `@core/*` alias).
+10. ✅ **`apps/telegram`** (web build reuse, hujjat) + ✅ **React Native skeleton** (`apps/native`, Expo) — *jonli build Expo talab qiladi, sandbox'da test qilinmagan*.
 
 ### Tier 4 — B6 production
 11. **Kod turlari** (`code_*`) → **Media turlari** (`image_choice/hotspot/audio` + MinIO/S3).
