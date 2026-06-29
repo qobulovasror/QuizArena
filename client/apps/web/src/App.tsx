@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "./core/store";
-import { setLang } from "./core/i18n";
-import { getTelegram } from "./core/telegram";
+import { useGame } from "@core/store";
+import { setLang } from "@core/i18n";
+import { getTelegram } from "@core/telegram";
 import { AuthPage } from "./pages/AuthPage";
 import { LobbyPage } from "./pages/LobbyPage";
 import { HomePage } from "./pages/HomePage";

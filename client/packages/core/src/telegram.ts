@@ -14,6 +14,8 @@ export interface TgWebApp {
 }
 
 // getTelegram — Telegram ichida ishlamasa null (yoki initData bo'sh).
+// `typeof window` tekshiruvi — React Native muhitida (window yo'q) xavfsiz.
 export function getTelegram(): TgWebApp | null {
+  if (typeof window === "undefined") return null;
   return (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp ?? null;
 }

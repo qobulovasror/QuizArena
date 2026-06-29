@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
-import { api } from "../core/api";
-import type { RatingItem, LeaderboardRow } from "../core/api";
+import { useGame } from "@core/store";
+import { api } from "@core/api";
+import type { RatingItem, LeaderboardRow } from "@core/api";
 import { Card } from "../components/ui/card";
 import { cn } from "../lib/cn";
 

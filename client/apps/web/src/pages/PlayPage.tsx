@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
-import type { AnswerChoice } from "../core/store";
+import { useGame } from "@core/store";
+import type { AnswerChoice } from "@core/store";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { cn } from "../lib/cn";
-import type { QuestionShowData, QuestionRevealData, Option } from "../core/protocol";
+import type { QuestionShowData, QuestionRevealData, Option } from "@core/protocol";
 
 type Choice = AnswerChoice;
 

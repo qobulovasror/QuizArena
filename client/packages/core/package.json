@@ -1,0 +1,12 @@
+{
+  "name": "@quizarena/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QuizArena umumiy mantiq: WS/REST client, Zustand store, protokol tiplari, i18n — web, Telegram, React Native uchun bir xil (PLAN.md §1.5). UI qatlami yo'q. Manbadan (src/*) `@core/*` alias orqali iste'mol qilinadi.",
+  "peerDependencies": {
+    "i18next": "*",
+    "react-i18next": "*",
+    "zustand": "*"
+  }
+}

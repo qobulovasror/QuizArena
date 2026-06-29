@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
-import { api } from "../core/api";
-import type { TournamentInfo, TournamentQ, TournamentLeaderRow, TournamentStatus, AssessAnswer } from "../core/api";
+import { useGame } from "@core/store";
+import { api } from "@core/api";
+import type { TournamentInfo, TournamentQ, TournamentLeaderRow, TournamentStatus, AssessAnswer } from "@core/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
-import { api } from "../core/api";
-import type { SrsCard } from "../core/api";
+import { useGame } from "@core/store";
+import { api } from "@core/api";
+import type { SrsCard } from "@core/api";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { cn } from "../lib/cn";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
+import { useGame } from "@core/store";
 import { LobbyPage } from "./LobbyPage";
 import { PracticePage } from "./PracticePage";
 import { AssessPage } from "./AssessPage";

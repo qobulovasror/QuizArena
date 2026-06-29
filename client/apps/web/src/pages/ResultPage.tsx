@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useGame } from "../core/store";
+import { useGame } from "@core/store";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { cn } from "../lib/cn";
