@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGame } from "../core/store";
+import type { AnswerChoice } from "../core/store";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { cn } from "../lib/cn";
-import type { QuestionShowData, QuestionRevealData } from "../core/protocol";
+import type { QuestionShowData, QuestionRevealData, Option } from "../core/protocol";
 
-type Choice = { optionId?: string; value?: number | boolean };
+type Choice = AnswerChoice;
 
 export function PlayPage() {
   const { t } = useTranslation();
@@ -31,8 +32,11 @@ export function PlayPage() {
   const revealed = !!reveal && reveal.index === question.index;
   const answered = answeredIndex === question.index;
   const timePerQ = room?.config.timePerQ ?? 15;
+  // time_attack — yagona vaqt byudjeti (timePerQ × savol soni); aks holda har savol vaqti.
+  const totalMs =
+    (room?.config.mode === "time_attack" ? timePerQ * (room?.config.questionCount ?? 1) : timePerQ) * 1000;
   const myChoice: Choice | undefined = myAnswer?.index === question.index ? myAnswer.choice : undefined;
-  const iWasRight = revealed ? isMine(question.type, myChoice, reveal!.correct) : false;
+  const iWasRight = revealed && reveal ? isMine(question.type, myChoice, reveal.correct) : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
@@ -42,11 +46,11 @@ export function PlayPage() {
         <div className="rounded-lg bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-600">{t("play.eliminated")}</div>
       )}
 
-      {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={timePerQ * 1000} />}
+      {!revealed && <TimerBar deadlineTs={question.deadlineTs} totalMs={totalMs} />}
 
       <Card>
-        <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>
-        <QuestionBody question={question} reveal={revealed ? reveal! : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
+        {question.type !== "cloze" && <h2 className="mb-5 text-center text-xl font-semibold">{question.prompt}</h2>}
+        <QuestionBody key={question.index} question={question} reveal={revealed && reveal ? reveal : null} myChoice={myChoice} disabled={answered || revealed || eliminated} onAnswer={answer} />
         {answered && !revealed && <p className="mt-4 text-center text-sm text-indigo-600">{t("play.accepted")}</p>}
         {revealed && (
           <p className={cn("mt-4 text-center text-sm font-semibold", iWasRight ? "text-green-600" : "text-red-600")}>
@@ -55,10 +59,13 @@ export function PlayPage() {
         )}
       </Card>
 
-      {revealed && (
+      {revealed && reveal && (
         <Card className="space-y-2">
-          {reveal!.explanation && <p className="text-sm text-slate-600">{reveal!.explanation}</p>}
-          <Leaderboard entries={reveal!.leaderboard} selfId={selfUserId} />
+          {["ordering", "cloze", "match", "categorize"].includes(question.type) && (
+            <CorrectAnswer question={question} correct={reveal.correct} />
+          )}
+          {reveal.explanation && <p className="text-sm text-slate-600">{reveal.explanation}</p>}
+          <Leaderboard entries={reveal.leaderboard} selfId={selfUserId} />
         </Card>
       )}
     </div>
@@ -67,10 +74,86 @@ export function PlayPage() {
 
 function isMine(type: string, mine: Choice | undefined, correct: unknown): boolean {
   if (!mine) return false;
-  const c = correct as { optionId?: string; value?: number | boolean };
-  if (type === "numeric") return Number(mine.value) === Number(c.value);
-  if (type === "true_false") return mine.value === c.value;
-  return mine.optionId === c.optionId;
+  const c = (correct ?? {}) as {
+    optionId?: string;
+    value?: number | boolean;
+    order?: string[];
+    pairs?: Record<string, string>;
+    assign?: Record<string, string>;
+    blanks?: { accepted: string[] }[];
+    accepted?: string[];
+  };
+  const norm = (s: string) => s.trim().toLowerCase();
+  switch (type) {
+    case "numeric":
+      return Number(mine.value) === Number(c.value);
+    case "type_answer":
+    case "fill_blank":
+    case "anagram":
+      return (c.accepted ?? []).some((x) => norm(x) === norm(mine.text ?? ""));
+    case "true_false":
+      return mine.value === c.value;
+    case "ordering": {
+      const a = mine.order ?? [];
+      const b = c.order ?? [];
+      return a.length === b.length && a.every((x, i) => x === b[i]);
+    }
+    case "match": {
+      const a = mine.pairs ?? {};
+      const b = c.pairs ?? {};
+      const bk = Object.keys(b);
+      return Object.keys(a).length === bk.length && bk.every((k) => a[k] === b[k]);
+    }
+    case "categorize": {
+      const a = mine.assign ?? {};
+      const b = c.assign ?? {};
+      const bk = Object.keys(b);
+      return Object.keys(a).length === bk.length && bk.every((k) => a[k] === b[k]);
+    }
+    case "cloze": {
+      const a = mine.blanks ?? [];
+      const b = c.blanks ?? [];
+      return a.length === b.length && b.every((bl, i) => bl.accepted.some((x) => norm(x) === norm(a[i] ?? "")));
+    }
+    default:
+      return mine.optionId === c.optionId;
+  }
+}
+
+// CorrectAnswer — ordering/cloze/match/categorize uchun to'g'ri javobni matn ko'rinishida ko'rsatadi.
+function CorrectAnswer({ question, correct }: { question: QuestionShowData; correct: unknown }) {
+  const { t } = useTranslation();
+  const c = (correct ?? {}) as {
+    order?: string[];
+    pairs?: Record<string, string>;
+    assign?: Record<string, string>;
+    blanks?: { accepted: string[] }[];
+  };
+  const optText = (id: string) => question.options?.find((o) => o.id === id)?.text ?? id;
+  const tgtText = (id: string) => question.targets?.find((o) => o.id === id)?.text ?? id;
+
+  let rows: string[] = [];
+  if (question.type === "ordering" && c.order) {
+    rows = c.order.map((id, i) => `${i + 1}. ${optText(id)}`);
+  } else if (question.type === "cloze" && c.blanks) {
+    rows = c.blanks.map((b, i) => `${i + 1}. ${b.accepted.join(" / ")}`);
+  } else if (question.type === "match" && c.pairs) {
+    rows = Object.entries(c.pairs).map(([l, r]) => `${optText(l)} → ${tgtText(r)}`);
+  } else if (question.type === "categorize" && c.assign) {
+    rows = Object.entries(c.assign).map(([item, cat]) => `${optText(item)} → ${tgtText(cat)}`);
+  }
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="rounded-xl bg-green-50 px-4 py-3">
+      <p className="mb-1 text-sm font-semibold text-green-700">{t("play.correctLabel")}</p>
+      <ul className="space-y-0.5 text-sm text-slate-700">
+        {rows.map((r, i) => (
+          <li key={i}>{r}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function QuestionBody({
@@ -116,6 +199,24 @@ function QuestionBody({
 
   if (question.type === "numeric") {
     return <NumericBody reveal={reveal} myChoice={myChoice} disabled={disabled} onAnswer={onAnswer} />;
+  }
+
+  // type_answer/fill_blank/anagram — matn yoziladi (anagram: harflar prompt'da).
+  if (["type_answer", "fill_blank", "anagram"].includes(question.type)) {
+    return <TextBody reveal={reveal} myChoice={myChoice} disabled={disabled} onAnswer={onAnswer} />;
+  }
+
+  if (question.type === "ordering") {
+    return <OrderingBody items={question.options ?? []} disabled={disabled} onAnswer={onAnswer} />;
+  }
+  if (question.type === "cloze") {
+    return <ClozeBody prompt={question.prompt} disabled={disabled} onAnswer={onAnswer} />;
+  }
+  if (question.type === "match") {
+    return <AssignBody items={question.options ?? []} targets={question.targets ?? []} answerKey="pairs" disabled={disabled} onAnswer={onAnswer} />;
+  }
+  if (question.type === "categorize") {
+    return <AssignBody items={question.options ?? []} targets={question.targets ?? []} answerKey="assign" disabled={disabled} onAnswer={onAnswer} />;
   }
 
   return (
@@ -175,6 +276,142 @@ function NumericBody({
           {t("play.submitAnswer")}
         </Button>
       )}
+    </div>
+  );
+}
+
+// TextBody — type_answer/fill_blank/anagram uchun matnli javob (NumericBody uslubida).
+function TextBody({
+  reveal,
+  myChoice,
+  disabled,
+  onAnswer,
+}: {
+  reveal: QuestionRevealData | null;
+  myChoice: Choice | undefined;
+  disabled: boolean;
+  onAnswer: (choice: Choice) => void;
+}) {
+  const { t } = useTranslation();
+  const [val, setVal] = useState("");
+  const correct = (reveal?.correct ?? {}) as { accepted?: string[] };
+  return (
+    <div className="space-y-3">
+      <Input
+        value={reveal && myChoice ? String(myChoice.text ?? "") : val}
+        disabled={disabled}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder={t("play.enterAnswer")}
+        className="text-center text-lg"
+      />
+      {reveal ? (
+        <p className="text-center text-sm text-green-700">{t("play.correctAnswer", { val: (correct.accepted ?? []).join(" / ") })}</p>
+      ) : (
+        <Button className="w-full" disabled={disabled || val.trim() === ""} onClick={() => onAnswer({ text: val })}>
+          {t("play.submitAnswer")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function OrderingBody({ items, disabled, onAnswer }: { items: Option[]; disabled: boolean; onAnswer: (c: Choice) => void }) {
+  const { t } = useTranslation();
+  const [order, setOrder] = useState<Option[]>(items);
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = order.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    setOrder(next);
+  };
+  return (
+    <div className="space-y-2">
+      {order.map((o, i) => (
+        <div key={o.id} className="flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm">
+          <span className="w-5 text-slate-400">{i + 1}.</span>
+          <span className="flex-1">{o.text}</span>
+          <button disabled={disabled || i === 0} onClick={() => move(i, -1)} className="px-1.5 text-slate-500 disabled:opacity-30">▲</button>
+          <button disabled={disabled || i === order.length - 1} onClick={() => move(i, 1)} className="px-1.5 text-slate-500 disabled:opacity-30">▼</button>
+        </div>
+      ))}
+      <Button className="w-full" disabled={disabled} onClick={() => onAnswer({ order: order.map((o) => o.id) })}>
+        {t("play.submitAnswer")}
+      </Button>
+    </div>
+  );
+}
+
+function ClozeBody({ prompt, disabled, onAnswer }: { prompt: string; disabled: boolean; onAnswer: (c: Choice) => void }) {
+  const { t } = useTranslation();
+  const parts = prompt.split("___");
+  const blankCount = parts.length - 1;
+  const [vals, setVals] = useState<string[]>(Array(blankCount).fill(""));
+  return (
+    <div className="space-y-4">
+      <p className="text-center text-lg leading-9">
+        {parts.map((p, i) => (
+          <span key={i}>
+            {p}
+            {i < blankCount && (
+              <input
+                disabled={disabled}
+                value={vals[i]}
+                onChange={(e) => setVals(vals.map((v, j) => (j === i ? e.target.value : v)))}
+                className="mx-1 w-24 border-b-2 border-indigo-400 text-center outline-none disabled:opacity-60"
+              />
+            )}
+          </span>
+        ))}
+      </p>
+      <Button className="w-full" disabled={disabled || vals.some((v) => v.trim() === "")} onClick={() => onAnswer({ blanks: vals })}>
+        {t("play.submitAnswer")}
+      </Button>
+    </div>
+  );
+}
+
+// AssignBody — match (chap→o'ng) va categorize (element→toifa) uchun umumiy.
+function AssignBody({
+  items,
+  targets,
+  answerKey,
+  disabled,
+  onAnswer,
+}: {
+  items: Option[];
+  targets: Option[];
+  answerKey: "pairs" | "assign";
+  disabled: boolean;
+  onAnswer: (c: Choice) => void;
+}) {
+  const { t } = useTranslation();
+  const [map, setMap] = useState<Record<string, string>>({});
+  const complete = items.length > 0 && items.every((it) => map[it.id]);
+  return (
+    <div className="space-y-2">
+      {items.map((it) => (
+        <div key={it.id} className="flex items-center gap-2">
+          <span className="flex-1 rounded-lg bg-slate-50 px-3 py-2 text-sm">{it.text}</span>
+          <span className="text-slate-400">→</span>
+          <select
+            disabled={disabled}
+            value={map[it.id] ?? ""}
+            onChange={(e) => setMap({ ...map, [it.id]: e.target.value })}
+            className="flex-1 rounded-lg border border-slate-300 px-2 py-2 text-sm disabled:opacity-60"
+          >
+            <option value="">—</option>
+            {targets.map((tg) => (
+              <option key={tg.id} value={tg.id}>
+                {tg.text}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+      <Button className="w-full" disabled={disabled || !complete} onClick={() => onAnswer({ [answerKey]: map })}>
+        {t("play.submitAnswer")}
+      </Button>
     </div>
   );
 }

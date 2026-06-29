@@ -17,7 +17,9 @@ export type ClientMsgType =
   | "room:resume"
   | "room:leave"
   | "game:start"
-  | "answer:submit";
+  | "answer:submit"
+  | "match:queue"
+  | "match:cancel";
 
 export type ServerMsgType =
   | "room:state"
@@ -28,6 +30,8 @@ export type ServerMsgType =
   | "question:reveal"
   | "player:scored"
   | "game:over"
+  | "match:queued"
+  | "match:found"
   | "error";
 
 // ---- Umumiy tuzilmalar ----
@@ -43,6 +47,7 @@ export interface Player {
   connected: boolean;
   isBot?: boolean;
   eliminated?: boolean;
+  team?: string; // team rejimi
 }
 
 export interface RoomConfig {
@@ -64,15 +69,28 @@ export interface LeaderboardEntry {
   correctCnt: number;
   rank: number;
   eliminated?: boolean;
+  team?: string; // team rejimi
+}
+
+// TeamStanding — jamoa yig'indisi (team rejimi; reveal/over'da).
+export interface TeamStanding {
+  team: string;
+  score: number;
+  correctCnt: number;
+  rank: number;
 }
 
 // `choice` / `correct` savol turiga qarab o'zgaradi (README §6).
 export type AnswerChoice =
-  | { optionId: string }            // mcq
-  | { value: boolean }              // true_false
-  | { optionIds: string[] }         // multi_select
-  | { text: string }                // type_answer / fill_blank
-  | { value: number };              // numeric
+  | { optionId: string }                        // mcq
+  | { value: boolean }                          // true_false
+  | { optionIds: string[] }                     // multi_select
+  | { text: string }                            // type_answer / fill_blank
+  | { value: number }                           // numeric
+  | { pairs: Record<string, string> }           // match
+  | { assign: Record<string, string> }          // categorize
+  | { order: string[] }                         // ordering
+  | { blanks: string[] };                       // cloze
 
 // ---- Client → Server yuklar ----
 export interface RoomCreateData {
@@ -80,6 +98,7 @@ export interface RoomCreateData {
   categoryId?: string;
   mode: GameMode;
   opponent?: OpponentKind;
+  botDifficulty?: "easy" | "medium" | "hard";
   questionCount: number;
   timePerQ: number;
   displayName: string; // host ham o'yinchi
@@ -95,6 +114,10 @@ export interface RoomResumeData {
 export interface AnswerSubmitData {
   questionIndex: number;
   choice: AnswerChoice;
+}
+export interface MatchQueueData {
+  subjectId: string;
+  displayName: string;
 }
 
 // ---- Server → Client yuklar ----
@@ -120,6 +143,7 @@ export interface QuestionShowData {
   type: string; // §5 katalog turi
   prompt: string;
   options?: Option[];
+  targets?: Option[]; // match(o'ng)/categorize(toifa)
   deadlineTs: number; // server epoch ms
 }
 export interface AnswerAckData {
@@ -131,12 +155,21 @@ export interface QuestionRevealData {
   correct: unknown; // tur bo'yicha shakl (README §6)
   explanation?: string;
   leaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[]; // team rejimi
 }
 export interface PlayerScoredData {
   leaderboard: LeaderboardEntry[];
 }
 export interface GameOverData {
   finalLeaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[]; // team rejimi
+}
+export interface MatchQueuedData {
+  subjectId: string;
+}
+export interface MatchFoundData {
+  sessionId: string;
+  vsBot: boolean;
 }
 
 export type ErrorCode =
@@ -164,6 +197,8 @@ export interface ClientMessageMap {
   "room:leave": Record<string, never>;
   "game:start": Record<string, never>;
   "answer:submit": AnswerSubmitData;
+  "match:queue": MatchQueueData;
+  "match:cancel": Record<string, never>;
 }
 export interface ServerMessageMap {
   "room:state": RoomStateData;
@@ -174,6 +209,8 @@ export interface ServerMessageMap {
   "question:reveal": QuestionRevealData;
   "player:scored": PlayerScoredData;
   "game:over": GameOverData;
+  "match:queued": MatchQueuedData;
+  "match:found": MatchFoundData;
   error: ErrorData;
 }
 

@@ -32,17 +32,20 @@ type Engine struct {
 
 	Countdown int           // boshlanish sanog'i (soniya); testda 0
 	RevealGap time.Duration // reveal'dan keyingi pauza
+
+	BotCorrectProb float64 // 🏆 simulyatsion raqib to'g'ri javob ehtimoli (0..1)
 }
 
 func NewEngine(hub *ws.Hub, store state.Store, registry *Registry, persister Persister, logger *slog.Logger) *Engine {
 	return &Engine{
-		hub:       hub,
-		store:     store,
-		registry:  registry,
-		persister: persister,
-		logger:    logger,
-		Countdown: 5,
-		RevealGap: 2 * time.Second,
+		hub:            hub,
+		store:          store,
+		registry:       registry,
+		persister:      persister,
+		logger:         logger,
+		Countdown:      5,
+		RevealGap:      2 * time.Second,
+		BotCorrectProb: 0.65, // o'rta qiyinlik
 	}
 }
 
@@ -75,13 +78,17 @@ func (e *Engine) CreateRoom(c *ws.Client, d ws.RoomCreateData) {
 		Status:    state.Lobby,
 		Config: state.Config{
 			SubjectID: d.SubjectID, CategoryID: d.CategoryID, Mode: mode,
-			Opponent: orDefault(d.Opponent, "human"), QuestionCount: d.QuestionCount, TimePerQ: d.TimePerQ,
+			Opponent: orDefault(d.Opponent, "human"), BotDifficulty: d.BotDifficulty,
+			QuestionCount: d.QuestionCount, TimePerQ: d.TimePerQ,
 		},
 		Players: map[string]*state.Player{
 			userID: {UserID: userID, Name: d.DisplayName, Connected: true, JoinedAt: nowMs(), Persistent: c.AuthUserID() != ""},
 		},
 	}
 	e.store.Create(room)
+	if wantsBot(mode, room.Config.Opponent) { // 🏆 raqib bot — lobby'da ko'rinadi
+		addBot(room)
+	}
 
 	c.SetIdentity(userID, d.DisplayName)
 	e.hub.Join(c, sessionID)
@@ -132,11 +139,19 @@ func (e *Engine) Resume(c *ws.Client, d ws.RoomResumeData) {
 	p.Connected = true
 	name := p.Name
 	running := room.Status == state.Running
+	total := len(room.Questions)
 	var cur *state.LiveQuestion
-	if running && room.CurrentIdx < len(room.Questions) {
-		cur = room.Questions[room.CurrentIdx]
+	var idx int
+	var deadline int64
+	if running {
+		if room.Config.Mode == "time_attack" {
+			if !p.TaDone && p.TaIdx < total { // o'yinchining joriy savoli, yagona deadline bilan
+				cur, idx, deadline = room.Questions[p.TaIdx], p.TaIdx, room.GlobalDeadline
+			}
+		} else if room.CurrentIdx < total {
+			cur, idx, deadline = room.Questions[room.CurrentIdx], room.CurrentIdx, room.Questions[room.CurrentIdx].Deadline
+		}
 	}
-	idx, total := room.CurrentIdx, len(room.Questions)
 	room.Mu.Unlock()
 
 	c.SetIdentity(d.ResumeToken, name)
@@ -144,7 +159,7 @@ func (e *Engine) Resume(c *ws.Client, d ws.RoomResumeData) {
 	c.Send(ws.SRoomJoined, ws.RoomJoinedData{SessionID: room.SessionID, UserID: d.ResumeToken, ResumeToken: d.ResumeToken})
 	e.broadcastState(room)
 	if cur != nil {
-		c.Send(ws.SQuestionShow, e.showPayload(cur, idx, total)) // qolgan deadline bilan
+		c.Send(ws.SQuestionShow, e.showPayload(cur, idx, total, deadline)) // qolgan deadline bilan
 	}
 }
 
@@ -175,6 +190,9 @@ func (e *Engine) StartGame(c *ws.Client) {
 	room.Status = state.Running
 	room.CurrentIdx = 0
 	room.StartedAt = time.Now()
+	if room.Config.Mode == "team" {
+		assignTeams(room) // lock ushlab turilgan
+	}
 	room.Mu.Unlock()
 
 	e.broadcastState(room) // status=running → clientlar Play ekraniga o'tadi
@@ -185,6 +203,10 @@ func (e *Engine) SubmitAnswer(c *ws.Client, d ws.AnswerSubmitData) {
 	room, ok := e.store.Get(c.Room())
 	if !ok {
 		c.SendError(ws.ErrRoomNotFound, "xona topilmadi")
+		return
+	}
+	if room.Config.Mode == "time_attack" {
+		e.submitTimeAttack(c, room, d)
 		return
 	}
 	userID := c.UserID()
@@ -225,11 +247,66 @@ func (e *Engine) SubmitAnswer(c *ws.Client, d ws.AnswerSubmitData) {
 	if p != nil {
 		modes.For(room.Config.Mode).OnAnswer(p, q, correct, now)
 	}
+	// Audit: javobni yig'amiz; o'yin tugagach answers_log'ga yoziladi (§7).
+	room.Answers = append(room.Answers, state.AnswerEvent{
+		UserID: userID, QuestionID: q.ID, Given: d.Choice,
+		IsCorrect: correct, TimeMs: int(now - q.AskedAt),
+	})
 	room.Mu.Unlock()
 
 	// To'g'rilikni OSHKOR QILMAYDI — faqat qabul qilingani.
 	c.Send(ws.SAnswerAck, ws.AnswerAckData{Index: d.QuestionIndex, Accepted: true})
-	// TODO(auth bilan): answers_log DB'ga yoziladi.
+}
+
+// submitTimeAttack — per-player oqim: javobni baholaydi va DARHOL keyingi savolni
+// shu o'yinchiga yuboradi (reveal yo'q — bu vaqtga poyga). Yagona deadline'gacha.
+func (e *Engine) submitTimeAttack(c *ws.Client, room *state.Room, d ws.AnswerSubmitData) {
+	userID := c.UserID()
+
+	room.Mu.Lock()
+	if room.Status != state.Running {
+		room.Mu.Unlock()
+		c.SendError(ws.ErrBadRequest, "o'yin faol emas")
+		return
+	}
+	now := nowMs()
+	if now > room.GlobalDeadline {
+		room.Mu.Unlock()
+		c.SendError(ws.ErrDeadlinePassed, "vaqt tugadi")
+		return
+	}
+	p := room.Players[userID]
+	if p == nil || p.TaDone {
+		room.Mu.Unlock()
+		c.SendError(ws.ErrBadRequest, "savol qolmadi")
+		return
+	}
+	if d.QuestionIndex != p.TaIdx {
+		room.Mu.Unlock()
+		c.SendError(ws.ErrBadRequest, "savol indeksi mos emas")
+		return
+	}
+	q := room.Questions[p.TaIdx]
+	correct := qtype.For(q.Type).Validate(d.Choice, q.Correct)
+	modes.For(room.Config.Mode).OnAnswer(p, q, correct, now)
+	room.Answers = append(room.Answers, state.AnswerEvent{
+		UserID: userID, QuestionID: q.ID, Given: d.Choice, IsCorrect: correct, TimeMs: 0,
+	})
+	p.TaIdx++
+	total := len(room.Questions)
+	idx, deadline := p.TaIdx, room.GlobalDeadline
+	var next *state.LiveQuestion
+	if p.TaIdx >= total {
+		p.TaDone = true
+	} else {
+		next = room.Questions[p.TaIdx]
+	}
+	room.Mu.Unlock()
+
+	c.Send(ws.SAnswerAck, ws.AnswerAckData{Index: d.QuestionIndex, Accepted: true})
+	if next != nil {
+		c.Send(ws.SQuestionShow, e.showPayload(next, idx, total, deadline))
+	}
 }
 
 // HandleDisconnect — ulanish uzilganda o'yinchini belgilaydi/o'chiradi.
@@ -263,6 +340,15 @@ func (e *Engine) Leave(c *ws.Client) {
 // ---- O'yin yurituvchi (har xona uchun bitta goroutine) ----
 
 func (e *Engine) run(room *state.Room) {
+	if room.Config.Mode == "time_attack" {
+		e.runTimeAttack(room)
+		return
+	}
+	e.runSync(room)
+}
+
+// runSync — sinxron oqim (classic/survival/team): hamma bir vaqtda bitta savol.
+func (e *Engine) runSync(room *state.Room) {
 	sessionID := room.SessionID
 
 	for s := e.Countdown; s > 0; s-- {
@@ -285,7 +371,8 @@ func (e *Engine) run(room *state.Room) {
 		deadline := q.Deadline
 		room.Mu.Unlock()
 
-		e.hub.BroadcastMsg(sessionID, ws.SQuestionShow, e.showPayload(q, idx, total))
+		e.hub.BroadcastMsg(sessionID, ws.SQuestionShow, e.showPayload(q, idx, total, deadline))
+		e.scheduleBots(room, q, deadline) // 🏆 botlar deadline ichida javob beradi
 
 		// Deadline'gacha kutish. TODO: hamma javob bersa erta o'tish (early-advance).
 		time.Sleep(time.Until(time.UnixMilli(deadline)))
@@ -295,6 +382,7 @@ func (e *Engine) run(room *state.Room) {
 			Correct:     q.Correct, // tur-spetsifik to'g'ri javob (reveal shakli)
 			Explanation: q.Explanation,
 			Leaderboard: e.leaderboard(room),
+			Teams:       e.teamStandings(room), // team rejimida jamoa yig'indisi (aks holda nil)
 		})
 		if mode.EndEarly(room) { // survival: bittadan kam tirik qolsa
 			break
@@ -306,11 +394,68 @@ func (e *Engine) run(room *state.Room) {
 	room.Status = state.Finished
 	room.Mu.Unlock()
 
-	e.hub.BroadcastMsg(sessionID, ws.SGameOver, ws.GameOverData{FinalLeaderboard: e.leaderboard(room)})
+	e.hub.BroadcastMsg(sessionID, ws.SGameOver, ws.GameOverData{
+		FinalLeaderboard: e.leaderboard(room),
+		Teams:            e.teamStandings(room),
+	})
 
 	e.persist(room)
 
 	// Tugagandan keyin biroz turadi (kech reconnect natijani ko'rsin), so'ng tozalanadi.
+	time.AfterFunc(60*time.Second, func() { e.store.Delete(sessionID) })
+}
+
+// runTimeAttack — per-player oqim: har o'yinchi o'z tezligida, yagona vaqt byudjeti
+// ichida iloji boricha ko'p savolga javob beradi. Savol-javob submitTimeAttack'da,
+// bu goroutine faqat deadline'gacha (yoki hamma tugaguncha) kutadi va yakunlaydi.
+func (e *Engine) runTimeAttack(room *state.Room) {
+	sessionID := room.SessionID
+
+	for s := e.Countdown; s > 0; s-- {
+		e.hub.BroadcastMsg(sessionID, ws.SGameCountdown, ws.CountdownData{SecondsLeft: s})
+		time.Sleep(time.Second)
+	}
+
+	room.Mu.Lock()
+	total := len(room.Questions)
+	budget := int64(room.Config.TimePerQ) * int64(room.Config.QuestionCount) * 1000 // ms
+	deadline := nowMs() + budget
+	room.GlobalDeadline = deadline
+	ids := make([]string, 0, len(room.Players))
+	var botIDs []string
+	for id, p := range room.Players {
+		p.TaIdx, p.TaDone = 0, false
+		ids = append(ids, id)
+		if p.IsBot {
+			botIDs = append(botIDs, id)
+		}
+	}
+	first := room.Questions[0]
+	room.Mu.Unlock()
+
+	// Har INSON o'yinchiga birinchi savol (yagona deadline bilan); botlar real client emas.
+	for _, id := range ids {
+		e.hub.SendToUser(sessionID, id, ws.SQuestionShow, e.showPayload(first, 0, total, deadline))
+	}
+	// Botlar o'z tezligida savollarni "yechadi".
+	for _, id := range botIDs {
+		go e.runBotTimeAttack(room, id, deadline)
+	}
+
+	// Deadline yoki barcha (ulangan) o'yinchilar tugaguncha kutamiz.
+	for nowMs() < deadline {
+		if e.allTaDone(room) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	room.Mu.Lock()
+	room.Status = state.Finished
+	room.Mu.Unlock()
+
+	e.hub.BroadcastMsg(sessionID, ws.SGameOver, ws.GameOverData{FinalLeaderboard: e.leaderboard(room)})
+	e.persist(room)
 	time.AfterFunc(60*time.Second, func() { e.store.Delete(sessionID) })
 }
 
@@ -326,11 +471,20 @@ func (e *Engine) persist(room *state.Room) {
 		Code: room.Code, HostUserID: room.HostID, SubjectSlug: room.Config.SubjectID,
 		Mode: room.Config.Mode, Opponent: room.Config.Opponent,
 		QuestionCount: room.Config.QuestionCount, TimePerQ: room.Config.TimePerQ,
-		StartedAt: room.StartedAt, FinishedAt: time.Now(),
+		StartedAt: room.StartedAt, FinishedAt: time.Now(), Ranked: room.Ranked,
 	}
 	persistentOf := make(map[string]bool, len(room.Players))
 	for id, p := range room.Players {
 		persistentOf[id] = p.Persistent
+	}
+	for _, a := range room.Answers {
+		if !persistentOf[a.UserID] {
+			continue // anonim o'yinchi — users FK yo'q
+		}
+		rec.Answers = append(rec.Answers, AnswerRecord{
+			UserID: a.UserID, QuestionID: a.QuestionID, Given: a.Given,
+			IsCorrect: a.IsCorrect, TimeMs: a.TimeMs,
+		})
 	}
 	room.Mu.RUnlock()
 
@@ -352,14 +506,21 @@ func (e *Engine) persist(room *state.Room) {
 
 // ---- Yordamchilar ----
 
-func (e *Engine) showPayload(q *state.LiveQuestion, idx, total int) ws.QuestionShowData {
+func (e *Engine) showPayload(q *state.LiveQuestion, idx, total int, deadline int64) ws.QuestionShowData {
 	opts := make([]ws.Option, len(q.Options))
 	for i, o := range q.Options {
 		opts[i] = ws.Option{ID: o.ID, Text: o.Text} // Correct YO'Q
 	}
+	var targets []ws.Option
+	if len(q.Targets) > 0 {
+		targets = make([]ws.Option, len(q.Targets))
+		for i, tg := range q.Targets {
+			targets[i] = ws.Option{ID: tg.ID, Text: tg.Text}
+		}
+	}
 	return ws.QuestionShowData{
 		Index: idx, Total: total, Type: q.Type, Prompt: q.Prompt,
-		Options: opts, DeadlineTs: q.Deadline,
+		Options: opts, Targets: targets, DeadlineTs: deadline,
 	}
 }
 
@@ -378,7 +539,7 @@ func (e *Engine) broadcastState(room *state.Room) {
 	}
 	for _, p := range room.Players {
 		st.Players = append(st.Players, ws.Player{
-			UserID: p.UserID, Name: p.Name, Score: p.Score, Connected: p.Connected, IsBot: p.IsBot, Eliminated: p.Eliminated,
+			UserID: p.UserID, Name: p.Name, Score: p.Score, Connected: p.Connected, IsBot: p.IsBot, Eliminated: p.Eliminated, Team: p.Team,
 		})
 	}
 	sessionID := room.SessionID
@@ -391,7 +552,7 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 	entries := make([]ws.LeaderboardEntry, 0, len(room.Players))
 	for _, p := range room.Players {
 		entries = append(entries, ws.LeaderboardEntry{
-			UserID: p.UserID, Name: p.Name, Score: p.Score, CorrectCnt: p.CorrectCnt, Eliminated: p.Eliminated,
+			UserID: p.UserID, Name: p.Name, Score: p.Score, CorrectCnt: p.CorrectCnt, Eliminated: p.Eliminated, Team: p.Team,
 		})
 	}
 	room.Mu.RUnlock()
@@ -409,12 +570,181 @@ func (e *Engine) leaderboard(room *state.Room) []ws.LeaderboardEntry {
 	return entries
 }
 
+// wantsBot — raqib bot/mixed bo'lsa va rejim botni qo'llab-quvvatlasa.
+func wantsBot(mode, opponent string) bool {
+	if opponent != "bot" && opponent != "mixed" {
+		return false
+	}
+	switch mode {
+	case "classic", "survival", "team", "time_attack":
+		return true
+	}
+	return false
+}
+
+// botProb — bot to'g'ri javob ehtimoli (qiyinlik darajasiga ko'ra). Daraja bo'sh bo'lsa
+// Engine sozlamasi (BotCorrectProb) — test override yoki default o'rta.
+func (e *Engine) botProb(room *state.Room) float64 {
+	switch room.Config.BotDifficulty {
+	case "easy":
+		return 0.45
+	case "medium":
+		return 0.65
+	case "hard":
+		return 0.85
+	default:
+		return e.BotCorrectProb
+	}
+}
+
+// addBot — xonaga simulyatsion raqib qo'shadi (Persistent emas → DB'ga yozilmaydi).
+func addBot(room *state.Room) {
+	id := uuid.NewString()
+	room.Players[id] = &state.Player{
+		UserID: id, Name: "🤖 Bot", Connected: true, IsBot: true, JoinedAt: nowMs(),
+	}
+}
+
+// runBotTimeAttack — time_attack per-player oqimida bot o'z savollarini ketma-ket
+// (tasodifiy oraliqlar bilan) ehtimoliy javoblaydi, TaDone bo'lguncha yoki deadline'gacha.
+func (e *Engine) runBotTimeAttack(room *state.Room, botID string, deadline int64) {
+	prob := e.botProb(room)
+	total := len(room.Questions)
+	for nowMs() < deadline {
+		time.Sleep(time.Duration(300+rand.Intn(900)) * time.Millisecond)
+		room.Mu.Lock()
+		if room.Status != state.Running {
+			room.Mu.Unlock()
+			return
+		}
+		bp := room.Players[botID]
+		if bp == nil || bp.TaDone || bp.TaIdx >= total {
+			room.Mu.Unlock()
+			return
+		}
+		q := room.Questions[bp.TaIdx]
+		modes.For("time_attack").OnAnswer(bp, q, rand.Float64() < prob, nowMs())
+		bp.TaIdx++
+		if bp.TaIdx >= total {
+			bp.TaDone = true
+		}
+		room.Mu.Unlock()
+	}
+}
+
+// scheduleBots — har bot uchun deadline ichida tasodifiy vaqtda ehtimoliy javob
+// rejalashtiradi (time.AfterFunc). Bot to'g'ri javobni p ehtimol bilan beradi;
+// to'g'ri optionId shart emas — natija (correct bool) bevosita OnAnswer'ga uzatiladi.
+func (e *Engine) scheduleBots(room *state.Room, q *state.LiveQuestion, deadline int64) {
+	room.Mu.RLock()
+	mode := room.Config.Mode
+	askedAt := q.AskedAt
+	var botIDs []string
+	for id, p := range room.Players {
+		if p.IsBot && !p.Eliminated {
+			botIDs = append(botIDs, id)
+		}
+	}
+	room.Mu.RUnlock()
+
+	span := deadline - askedAt
+	if span <= 0 {
+		return
+	}
+	prob := e.botProb(room)
+	for _, id := range botIDs {
+		botID := id
+		delay := time.Duration(float64(span)*(0.2+0.6*rand.Float64())) * time.Millisecond
+		correct := rand.Float64() < prob
+		time.AfterFunc(delay, func() {
+			room.Mu.Lock()
+			defer room.Mu.Unlock()
+			// Deadline o'tib ketgan bo'lsa (reveal bo'lgan) — kech javobni hisoblamaymiz.
+			if room.Status != state.Running || q.Answered[botID] || nowMs() > q.Deadline {
+				return
+			}
+			p := room.Players[botID]
+			if p == nil || p.Eliminated {
+				return
+			}
+			q.Answered[botID] = true
+			modes.For(mode).OnAnswer(p, q, correct, nowMs())
+		})
+	}
+}
+
+// assignTeams — o'yinchilarni 2 jamoaga balanslab taqsimlaydi (qo'shilish tartibida
+// navbatma-navbat A/B). room.Mu LOCK ushlab turilgan holatda chaqiriladi.
+func assignTeams(room *state.Room) {
+	ids := make([]string, 0, len(room.Players))
+	for id := range room.Players {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return room.Players[ids[i]].JoinedAt < room.Players[ids[j]].JoinedAt
+	})
+	names := [2]string{"A", "B"}
+	for i, id := range ids {
+		room.Players[id].Team = names[i%2]
+	}
+}
+
+// teamStandings — jamoa yig'indisi (faqat team rejimi; aks holda nil → omitempty).
+func (e *Engine) teamStandings(room *state.Room) []ws.TeamStanding {
+	room.Mu.RLock()
+	if room.Config.Mode != "team" {
+		room.Mu.RUnlock()
+		return nil
+	}
+	agg := map[string]*ws.TeamStanding{}
+	for _, p := range room.Players {
+		if p.Team == "" {
+			continue
+		}
+		s := agg[p.Team]
+		if s == nil {
+			s = &ws.TeamStanding{Team: p.Team}
+			agg[p.Team] = s
+		}
+		s.Score += p.Score
+		s.CorrectCnt += p.CorrectCnt
+	}
+	room.Mu.RUnlock()
+
+	out := make([]ws.TeamStanding, 0, len(agg))
+	for _, s := range agg {
+		out = append(out, *s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	for i := range out {
+		out[i].Rank = i + 1
+	}
+	return out
+}
+
+// allTaDone — time_attack: barcha ULANGAN o'yinchilar savollarini tugatdimi.
+func (e *Engine) allTaDone(room *state.Room) bool {
+	room.Mu.RLock()
+	defer room.Mu.RUnlock()
+	for _, p := range room.Players {
+		if p.Connected && !p.TaDone {
+			return false
+		}
+	}
+	return true
+}
+
 func buildLive(qs []state.Question) []*state.LiveQuestion {
 	live := make([]*state.LiveQuestion, len(qs))
 	for i, q := range qs {
 		opts := append([]state.Option(nil), q.Options...)
 		rand.Shuffle(len(opts), func(a, b int) { opts[a], opts[b] = opts[b], opts[a] })
 		q.Options = opts
+		if len(q.Targets) > 0 { // match/categorize: o'ng tomon/toifalarni ham aralashtiramiz
+			tg := append([]state.Option(nil), q.Targets...)
+			rand.Shuffle(len(tg), func(a, b int) { tg[a], tg[b] = tg[b], tg[a] })
+			q.Targets = tg
+		}
 		live[i] = &state.LiveQuestion{Question: q, Answered: make(map[string]bool)}
 	}
 	return live

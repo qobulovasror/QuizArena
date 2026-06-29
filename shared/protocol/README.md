@@ -39,12 +39,14 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 
 | `type` | `data` | Izoh |
 |---|---|---|
-| `room:create` | `{ subjectId, categoryId?, mode, opponent?, questionCount, timePerQ, displayName }` | Xona yaratish; yuboruvchi **host** (va o'yinchi) bo'ladi. `mode`=classic/... ; `opponent`=human/bot/mixed. `timePerQ` — soniya. |
+| `room:create` | `{ subjectId, categoryId?, mode, opponent?, botDifficulty?, questionCount, timePerQ, displayName }` | Xona yaratish; yuboruvchi **host** (va o'yinchi) bo'ladi. `mode`=classic/... ; `opponent`=human/bot/mixed; `botDifficulty`=easy/medium/hard (bot raqibda). `timePerQ` — soniya. |
 | `room:join` | `{ code, displayName }` | Kod bilan qo'shilish. |
 | `room:resume` | `{ sessionId, resumeToken }` | Uzilishdan keyin qayta ulanish (token `room:joined` da berilgan). |
 | `room:leave` | `{}` | Xonadan chiqish. |
 | `game:start` | `{}` | O'yinni boshlash (**faqat host**). |
 | `answer:submit` | `{ questionIndex, choice }` | Xom javob. `choice` shakli savol turiga bog'liq (§6). To'g'rilik **client'ga bog'liq emas** — server hal qiladi. |
+| `match:queue` | `{ subjectId, displayName }` | 🏆 1v1 navbatga qo'shilish (subject slug bo'yicha). |
+| `match:cancel` | `{}` | Navbatdan chiqish. |
 
 ## 4. Server → Client xabarlar
 
@@ -55,9 +57,11 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 | `game:countdown` | `{ secondsLeft }` | Boshlanish sanog'i (5…1). |
 | `question:show` | `{ index, total, type, prompt, options?, deadlineTs }` | Savol. **`correct` YO'Q.** `deadlineTs` — server epoch **ms**. |
 | `answer:ack` | `{ index, accepted }` | *Ixtiyoriy.* Javob qabul qilingani (to'g'rilikni **oshkor qilmaydi**). |
-| `question:reveal` | `{ index, correct, explanation?, leaderboard[] }` | Deadline tugagach: to'g'ri javob + izoh + reyting. |
+| `question:reveal` | `{ index, correct, explanation?, leaderboard[], teams? }` | Deadline tugagach: to'g'ri javob + izoh + reyting. `teams` — faqat team rejimi. |
 | `player:scored` | `{ leaderboard[] }` | *Ixtiyoriy* jonli reyting yangilanishi. |
-| `game:over` | `{ finalLeaderboard[] }` | O'yin tugadi. |
+| `game:over` | `{ finalLeaderboard[], teams? }` | O'yin tugadi. `teams` — faqat team rejimi. |
+| `match:queued` | `{ subjectId }` | 🏆 Navbatga qo'shildi (raqib kutilmoqda). |
+| `match:found` | `{ sessionId, vsBot }` | Raqib topildi; ketidan `room:joined`+`room:state(running)` keladi va duel boshlanadi. |
 | `error` | `{ code, message }` | Xato (§7 kodlari). |
 
 ---
@@ -65,10 +69,11 @@ Protokol versiyasi: **v1**. O'zgarsa, yangi turlar qo'shiladi yoki `type` prefik
 ## 5. Umumiy tuzilmalar
 
 ```
-Player           { userId, name, score, connected, isBot?, eliminated? }
+Player           { userId, name, score, connected, isBot?, eliminated?, team? }
 RoomConfig       { subjectId, mode, questionCount, timePerQ }
 Option           { id, text }              // id — opaque (server shuffle qiladi)
-LeaderboardEntry { userId, name, score, correctCnt, rank, eliminated? }   // eliminated: survival
+LeaderboardEntry { userId, name, score, correctCnt, rank, eliminated?, team? }   // eliminated: survival, team: team rejimi
+TeamStanding     { team, score, correctCnt, rank }    // team rejimi yig'indisi
 ```
 
 ## 6. Savol turiga qarab `choice` / `correct` shakli
@@ -82,9 +87,23 @@ oshkor bo'lmaydi. Javob va to'g'ri javob shakli (1-bosqich `mcq` uchun):
 | `true_false` | — | `{ value: true|false }` | `{ value }` |
 | `multi_select` | `[{id,text}]` | `{ optionIds: [] }` | `{ optionIds: [] }` |
 | `type_answer`/`fill_blank` | — | `{ text }` | `{ accepted: [] }` |
+| `anagram` | — | `{ text }` | `{ accepted: [] }` |
 | `numeric` | — | `{ value }` | `{ value, tolerance? }` |
+| `match` | `[{id,text}]` (chap) | `{ pairs: { leftId: rightId } }` | `{ pairs: { leftId: rightId } }` |
+| `ordering` | `[{id,text}]` (aralash) | `{ order: [id,…] }` | `{ order: [id,…] }` |
+| `categorize` | `[{id,text}]` (elementlar) | `{ assign: { itemId: catId } }` | `{ assign: { itemId: catId } }` |
+| `cloze` | — | `{ blanks: [text,…] }` | `{ blanks: [ {accepted:[…]}, … ] }` |
 
+> `match`/`categorize` — to'la moslik (har juft/element to'g'ri); `ordering` — aniq tartib;
+> `cloze` — har bo'shliq mos `accepted` ro'yxatida (normalize: trim + lowercase).
+> `anagram` — `type_answer` kabi baholanadi; aralashtirilgan harflar `prompt` ichida beriladi.
 > Boshqa turlar (§5 katalog) keyingi bosqichlarda shu jadvalga qo'shiladi.
+
+**Render uchun qo'shimcha (`question:show`):**
+- `match` — `options` = chap ustun (juftlanadigan), **`targets`** = o'ng ustun (variantlar). Ikkalasi opaque `id`, server aralashtiradi.
+- `categorize` — `options` = elementlar, **`targets`** = toifalar.
+- `ordering` — `options` = aralashtirilgan elementlar; client qayta tartiblaydi, javobda `order` id ketma-ketligi.
+- `cloze` — `options` yo'q; `prompt` ichida har bo'shliq **`___`** (3 ta pastki chiziq) bilan belgilanadi; client shu markerlar sonicha kiritish maydoni chizadi.
 > Server `choice` ni **xom** (`json.RawMessage`/`unknown`) qabul qiladi va tur strategiyasi
 > orqali tekshiradi.
 
@@ -121,6 +140,34 @@ host: game:start ──► game:countdown (5..1)
    └────────────────────────────────────────────────────────────────┘  × N
 server ► game:over { finalLeaderboard }
 ```
+
+### 8.1 Rejimga xos oqim farqlari
+
+- **`classic` / `team`** — yuqoridagi sinxron oqim. `team`'da o'yinchilar StartGame'da
+  2 jamoaga (A/B) balanslab taqsimlanadi; ball individ, lekin `question:reveal` va
+  `game:over` qo'shimcha `teams[]` (jamoa yig'indisi) yuboradi. `Player.team` to'ldiriladi.
+- **`survival`** — sinxron, lekin xato javob o'yinchini chiqaradi (`eliminated`); bittadan
+  kam tirik qolsa o'yin erta tugaydi.
+- **`time_attack`** — **per-player oqim**: har o'yinchi o'z sur'atida. `game:countdown`dan
+  so'ng har kim **o'z** `question:show`'ini oladi (`deadlineTs` — butun o'yin uchun yagona).
+  Har `answer:submit` → `answer:ack` + **darhol keyingi** `question:show` (reveal **yo'q**).
+  Savollar tugaganda yoki yagona deadline kelganda `game:over`. Ball = to'g'ri javob soni.
+
+### 8.2 🏆 Matchmaking (1v1 duel)
+
+```
+client ► match:queue { subjectId, displayName }
+server ► match:queued { subjectId }              (raqib kutilmoqda)
+   ├─ raqib topildi (yoki ~10s dan keyin bot):
+   │  server ► match:found { sessionId, vsBot }
+   │  server ► room:joined { ... } + room:state (running)
+   │  └─ keyin oddiy classic oqim (§8) — countdown, savollar, game:over
+   └─ client ► match:cancel  → navbatdan chiqadi
+```
+
+> Duel — `classic` rejim (5 savol, 15s). Ikki inson o'ynasa **reytingli**: o'yin
+> tugagach ikkalasining subject ELO reytingi yangilanadi (`GET /api/me/rating`).
+> Bot bilan duel reytingsiz. Uzilish navbatdan avtomatik chiqaradi.
 
 ## 9. Reconnect
 

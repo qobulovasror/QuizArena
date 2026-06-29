@@ -73,6 +73,37 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 	return i, err
 }
 
+const getQuestionInSubject = `-- name: GetQuestionInSubject :one
+SELECT q.id, q.category_id, q.type, q.prompt, q.options, q.correct, q.accept, q.media_url, q.explanation, q.difficulty, q.meta, q.created_at FROM questions q
+JOIN categories c ON c.id = q.category_id
+WHERE q.id = $1 AND c.subject_id = $2
+`
+
+type GetQuestionInSubjectParams struct {
+	ID        uuid.UUID `json:"id"`
+	SubjectID uuid.UUID `json:"subject_id"`
+}
+
+func (q *Queries) GetQuestionInSubject(ctx context.Context, arg GetQuestionInSubjectParams) (Question, error) {
+	row := q.db.QueryRow(ctx, getQuestionInSubject, arg.ID, arg.SubjectID)
+	var i Question
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Type,
+		&i.Prompt,
+		&i.Options,
+		&i.Correct,
+		&i.Accept,
+		&i.MediaUrl,
+		&i.Explanation,
+		&i.Difficulty,
+		&i.Meta,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listQuestionsByCategory = `-- name: ListQuestionsByCategory :many
 SELECT id, category_id, type, prompt, options, correct, accept, media_url, explanation, difficulty, meta, created_at FROM questions WHERE category_id = $1
 `

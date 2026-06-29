@@ -22,10 +22,19 @@ func For(t string) QuestionType {
 		return trueFalse{}
 	case "numeric":
 		return numeric{}
-	case "type_answer", "fill_blank":
+	case "type_answer", "fill_blank", "anagram":
+		// anagram — aralashtirilgan harflar prompt'da; foydalanuvchi so'zni yozadi.
 		return typeAnswer{}
 	case "multi_select":
 		return multiSelect{}
+	case "match":
+		return match{}
+	case "categorize":
+		return categorize{}
+	case "ordering":
+		return ordering{}
+	case "cloze":
+		return cloze{}
 	default:
 		return mcq{}
 	}
@@ -110,7 +119,104 @@ func (multiSelect) Validate(choice, correct json.RawMessage) bool {
 	return sameSet(c.OptionIDs, k.OptionIDs)
 }
 
+// match — juftlash: leftId→rightId moslik to'liq mos kelishi kerak.
+type match struct{}
+
+func (match) Validate(choice, correct json.RawMessage) bool {
+	var c, k struct {
+		Pairs map[string]string `json:"pairs"`
+	}
+	if json.Unmarshal(choice, &c) != nil || json.Unmarshal(correct, &k) != nil {
+		return false
+	}
+	return sameMapping(c.Pairs, k.Pairs)
+}
+
+// categorize — har element to'g'ri toifaga (itemId→catId).
+type categorize struct{}
+
+func (categorize) Validate(choice, correct json.RawMessage) bool {
+	var c, k struct {
+		Assign map[string]string `json:"assign"`
+	}
+	if json.Unmarshal(choice, &c) != nil || json.Unmarshal(correct, &k) != nil {
+		return false
+	}
+	return sameMapping(c.Assign, k.Assign)
+}
+
+// ordering — id'lar ketma-ketligi aniq mos bo'lishi kerak.
+type ordering struct{}
+
+func (ordering) Validate(choice, correct json.RawMessage) bool {
+	var c, k struct {
+		Order []string `json:"order"`
+	}
+	if json.Unmarshal(choice, &c) != nil || json.Unmarshal(correct, &k) != nil {
+		return false
+	}
+	if len(c.Order) == 0 || len(c.Order) != len(k.Order) {
+		return false
+	}
+	for i := range k.Order {
+		if c.Order[i] != k.Order[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// cloze — ko'p bo'sh joy; har bo'shliq mos accepted ro'yxatida bo'lishi kerak.
+type cloze struct{}
+
+func (cloze) Validate(choice, correct json.RawMessage) bool {
+	var c struct {
+		Blanks []string `json:"blanks"`
+	}
+	var k struct {
+		Blanks []struct {
+			Accepted []string `json:"accepted"`
+		} `json:"blanks"`
+	}
+	if json.Unmarshal(choice, &c) != nil || json.Unmarshal(correct, &k) != nil {
+		return false
+	}
+	if len(c.Blanks) == 0 || len(c.Blanks) != len(k.Blanks) {
+		return false
+	}
+	for i, blank := range k.Blanks {
+		got := norm(c.Blanks[i])
+		if got == "" {
+			return false
+		}
+		matched := false
+		for _, a := range blank.Accepted {
+			if norm(a) == got {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
 func norm(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
+
+// sameMapping — ikki string→string xarita aynan teng (bo'sh bo'lmasa).
+func sameMapping(a, b map[string]string) bool {
+	if len(a) != len(b) || len(a) == 0 {
+		return false
+	}
+	for k, v := range b {
+		if a[k] != v {
+			return false
+		}
+	}
+	return true
+}
 
 func sameSet(a, b []string) bool {
 	if len(a) != len(b) || len(a) == 0 {

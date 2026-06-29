@@ -24,6 +24,7 @@ export function PracticePage() {
   const [idx, setIdx] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
   const load = useCallback(
     async (subj: string) => {
@@ -55,7 +56,11 @@ export function PracticePage() {
 
   async function grade(g: number) {
     if (!token || !card) return;
-    api.srsReview(card.questionId, g, token).catch(() => {});
+    setErr("");
+    api.srsReview(card.questionId, g, token).catch((e) => {
+      setErr(e instanceof Error ? e.message : "xato");
+      setTimeout(() => setErr(""), 2500);
+    });
     setRevealed(false);
     setIdx((i) => i + 1);
   }
@@ -78,6 +83,8 @@ export function PracticePage() {
           </button>
         ))}
       </div>
+
+      {err && <p className="text-center text-sm text-red-600">{err}</p>}
 
       {loading && <p className="py-10 text-center text-slate-400">{t("common.loading")}</p>}
 

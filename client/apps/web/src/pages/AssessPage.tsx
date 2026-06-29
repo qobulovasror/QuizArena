@@ -23,6 +23,7 @@ export function AssessPage() {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<AssessAnswer[]>([]);
   const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [msg, setMsg] = useState("");
 
   const loadMastery = useCallback(async () => {
     if (!token) return;
@@ -40,19 +41,19 @@ export function AssessPage() {
 
   async function start() {
     if (!token) return;
+    setMsg("");
     try {
       const qs = await api.assessQuestions(subject, token);
       if (qs.length === 0) {
-        setItems((x) => x); // no-op
-        alert("Bu sohada test savollari yo'q (DB bank kerak).");
+        setMsg(t("assess.noQuestions"));
         return;
       }
       setQuestions(qs);
       setIdx(0);
       setAnswers([]);
       setView("quiz");
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "xato");
     }
   }
 
@@ -63,10 +64,14 @@ export function AssessPage() {
     if (idx + 1 < questions.length) {
       setIdx(idx + 1);
     } else if (token) {
-      const res = await api.assessSubmit(next, token);
-      setScore(res);
-      setView("result");
-      loadMastery();
+      try {
+        const res = await api.assessSubmit(next, token);
+        setScore(res);
+        setView("result");
+        loadMastery();
+      } catch (e) {
+        setMsg(e instanceof Error ? e.message : "xato");
+      }
     }
   }
 
@@ -80,6 +85,7 @@ export function AssessPage() {
         <Card>
           <h2 className="mb-5 text-center text-xl font-semibold">{q.prompt}</h2>
           <AnswerInput q={q} onAnswer={answer} />
+          {msg && <p className="mt-4 text-center text-sm text-red-600">{msg}</p>}
         </Card>
       </div>
     );
@@ -148,6 +154,7 @@ export function AssessPage() {
         <Button className="w-full" onClick={start}>
           {t("assess.start")}
         </Button>
+        {msg && <p className="text-center text-sm text-red-600">{msg}</p>}
       </Card>
     </div>
   );

@@ -19,6 +19,10 @@ func For(name string) Mode {
 	switch name {
 	case "survival":
 		return Survival{}
+	case "time_attack":
+		return TimeAttack{}
+	case "team":
+		return Team{}
 	default:
 		return Classic{}
 	}
@@ -77,3 +81,34 @@ func (Survival) EndEarly(r *state.Room) bool {
 	}
 	return alive <= 1
 }
+
+// TimeAttack — har o'yinchi o'z tezligida; yagona vaqt ichida ko'p to'g'ri javob.
+// Engine per-player oqimda yuritadi (runTimeAttack); bu yerda faqat ball.
+// Tezlik bonusi yo'q — sur'at o'yinchining o'zida, to'g'ri javob soni hal qiladi.
+type TimeAttack struct{}
+
+func (TimeAttack) Name() string { return "time_attack" }
+
+func (TimeAttack) OnAnswer(p *state.Player, _ *state.LiveQuestion, correct bool, _ int64) {
+	if correct {
+		p.Score += 100
+		p.CorrectCnt++
+	}
+}
+
+func (TimeAttack) EndEarly(*state.Room) bool { return false }
+
+// Team — o'yinchilar jamoalarga bo'linadi; individ ball jamoa hisobiga yig'iladi.
+// Ball classic kabi (tezlik + to'g'rilik); jamoa yig'indisi leaderboard'da (engine).
+type Team struct{}
+
+func (Team) Name() string { return "team" }
+
+func (Team) OnAnswer(p *state.Player, q *state.LiveQuestion, correct bool, now int64) {
+	if correct {
+		p.Score += scoreFor(q, now)
+		p.CorrectCnt++
+	}
+}
+
+func (Team) EndEarly(*state.Room) bool { return false }

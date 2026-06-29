@@ -85,6 +85,23 @@ type Subject struct {
 	Icon *string   `json:"icon"`
 }
 
+type Tournament struct {
+	ID            uuid.UUID `json:"id"`
+	Title         string    `json:"title"`
+	SubjectID     uuid.UUID `json:"subject_id"`
+	QuestionCount int32     `json:"question_count"`
+	StartsAt      time.Time `json:"starts_at"`
+	EndsAt        time.Time `json:"ends_at"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type TournamentEntry struct {
+	TournamentID uuid.UUID `json:"tournament_id"`
+	UserID       uuid.UUID `json:"user_id"`
+	Score        int32     `json:"score"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Username     *string   `json:"username"`
@@ -102,4 +119,12 @@ type UserMastery struct {
 	Mastery    float64   `json:"mastery"`
 	Attempts   int32     `json:"attempts"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type UserRating struct {
+	UserID    uuid.UUID `json:"user_id"`
+	SubjectID uuid.UUID `json:"subject_id"`
+	Rating    int32     `json:"rating"`
+	Games     int32     `json:"games"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

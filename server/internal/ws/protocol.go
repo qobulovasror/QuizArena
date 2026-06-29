@@ -24,6 +24,8 @@ const (
 	CRoomLeave    MsgType = "room:leave"
 	CGameStart    MsgType = "game:start"
 	CAnswerSubmit MsgType = "answer:submit"
+	CMatchQueue   MsgType = "match:queue"  // 🏆 1v1 navbatga qo'shilish
+	CMatchCancel  MsgType = "match:cancel" // navbatdan chiqish
 )
 
 // Server → Client
@@ -36,6 +38,8 @@ const (
 	SQuestionReveal MsgType = "question:reveal"
 	SPlayerScored   MsgType = "player:scored"
 	SGameOver       MsgType = "game:over"
+	SMatchQueued    MsgType = "match:queued" // navbatga qo'shildi (raqib kutilmoqda)
+	SMatchFound     MsgType = "match:found"  // raqib topildi (duel boshlanadi)
 	SError          MsgType = "error"
 )
 
@@ -48,6 +52,7 @@ type Player struct {
 	Connected  bool    `json:"connected"`
 	IsBot      bool    `json:"isBot,omitempty"`
 	Eliminated bool    `json:"eliminated,omitempty"`
+	Team       string  `json:"team,omitempty"` // team rejimi
 }
 
 type RoomConfig struct {
@@ -70,6 +75,15 @@ type LeaderboardEntry struct {
 	CorrectCnt int     `json:"correctCnt"`
 	Rank       int     `json:"rank"`
 	Eliminated bool    `json:"eliminated,omitempty"`
+	Team       string  `json:"team,omitempty"` // team rejimi
+}
+
+// TeamStanding — jamoa yig'indisi (team rejimi; reveal/over'da yuboriladi).
+type TeamStanding struct {
+	Team       string  `json:"team"`
+	Score      float64 `json:"score"`
+	CorrectCnt int     `json:"correctCnt"`
+	Rank       int     `json:"rank"`
 }
 
 // ---- Client → Server yuklar ----
@@ -78,7 +92,8 @@ type RoomCreateData struct {
 	SubjectID     string `json:"subjectId"`
 	CategoryID    string `json:"categoryId,omitempty"`
 	Mode          string `json:"mode"`
-	Opponent      string `json:"opponent,omitempty"` // human|bot|mixed
+	Opponent      string `json:"opponent,omitempty"`      // human|bot|mixed
+	BotDifficulty string `json:"botDifficulty,omitempty"` // easy|medium|hard
 	QuestionCount int    `json:"questionCount"`
 	TimePerQ      int    `json:"timePerQ"`
 	DisplayName   string `json:"displayName"` // host ham o'yinchi
@@ -98,6 +113,12 @@ type RoomResumeData struct {
 type AnswerSubmitData struct {
 	QuestionIndex int             `json:"questionIndex"`
 	Choice        json.RawMessage `json:"choice"`
+}
+
+// MatchQueueData — 1v1 navbatga qo'shilish (soha + ko'rinadigan ism).
+type MatchQueueData struct {
+	SubjectID   string `json:"subjectId"`
+	DisplayName string `json:"displayName"`
 }
 
 // ---- Server → Client yuklar ----
@@ -127,7 +148,8 @@ type QuestionShowData struct {
 	Type       string   `json:"type"`
 	Prompt     string   `json:"prompt"`
 	Options    []Option `json:"options,omitempty"`
-	DeadlineTs int64    `json:"deadlineTs"` // server epoch ms
+	Targets    []Option `json:"targets,omitempty"` // match(o'ng)/categorize(toifa)
+	DeadlineTs int64    `json:"deadlineTs"`        // server epoch ms
 }
 
 type AnswerAckData struct {
@@ -140,6 +162,7 @@ type QuestionRevealData struct {
 	Correct     json.RawMessage    `json:"correct"` // tur bo'yicha shakl
 	Explanation string             `json:"explanation,omitempty"`
 	Leaderboard []LeaderboardEntry `json:"leaderboard"`
+	Teams       []TeamStanding     `json:"teams,omitempty"` // team rejimi
 }
 
 type PlayerScoredData struct {
@@ -148,6 +171,18 @@ type PlayerScoredData struct {
 
 type GameOverData struct {
 	FinalLeaderboard []LeaderboardEntry `json:"finalLeaderboard"`
+	Teams            []TeamStanding     `json:"teams,omitempty"` // team rejimi
+}
+
+// MatchQueuedData — navbatga qo'shilgani tasdiq (raqib kutilmoqda).
+type MatchQueuedData struct {
+	SubjectID string `json:"subjectId"`
+}
+
+// MatchFoundData — raqib topildi; duel xonasi (room:joined/state ketidan keladi).
+type MatchFoundData struct {
+	SessionID string `json:"sessionId"`
+	VsBot     bool   `json:"vsBot"`
 }
 
 type ErrorData struct {

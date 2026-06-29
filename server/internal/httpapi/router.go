@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,14 +34,18 @@ func Router(d Deps) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(cors)
+	r.Use(requestLogger(d.Logger))
+	r.Use(secureHeaders)
+	r.Use(corsMiddleware(d.Cfg.CORSOrigins))
 
 	r.Get("/healthz", health)
 	r.Get("/ws", ws.Handle(d.Hub, d.WSRouter, wsAuth(d.Auth), d.Logger))
 
 	if d.Auth != nil {
 		ah := &authHandler{svc: d.Auth, validate: validator.New(), logger: d.Logger}
+		authLimiter := newRateLimiter(30, time.Minute) // brute-force himoyasi (IP/daqiqa)
 		r.Route("/api/auth", func(r chi.Router) {
+			r.Use(authLimiter.middleware)
 			r.Post("/guest", ah.guest)
 			r.Post("/register", ah.register)
 			r.Post("/login", ah.login)
@@ -54,20 +59,31 @@ func Router(d Deps) http.Handler {
 			r.Get("/", sh.list)
 			r.Get("/{id}/categories", sh.categories)
 		})
+
+		// Global reyting (ochiq, auth shart emas)
+		lh := &leaderboardHandler{q: d.Queries, logger: d.Logger}
+		r.Get("/api/leaderboard/global", lh.global)
 	}
 
 	if d.Auth != nil && d.Queries != nil {
 		mh := &meHandler{q: d.Queries, logger: d.Logger}
 		sh := &srsHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
 		ah := &assessHandler{q: d.Queries, logger: d.Logger}
+		th := &tournamentHandler{q: d.Queries, validate: validator.New(), logger: d.Logger}
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth))
 			r.Get("/api/me/history", mh.history)
+			r.Get("/api/me/rating", mh.rating)   // 🏆 1v1 ELO reyting
 			r.Get("/api/me/srs/due", sh.due)     // 📚 takror kartalar
 			r.Post("/api/srs/review", sh.review) // 📚 baho → SM-2
 			r.Get("/api/me/assessment", ah.questions)
 			r.Post("/api/me/assessment/submit", ah.submit) // 📊 baholash → mastery
 			r.Get("/api/me/mastery", ah.mastery)
+			// Turnirlar (asinxron musobaqa)
+			r.Get("/api/tournaments", th.list)
+			r.Get("/api/tournaments/{id}/play", th.play)
+			r.Post("/api/tournaments/{id}/submit", th.submit)
+			r.Get("/api/tournaments/{id}/leaderboard", th.leaderboard)
 		})
 
 		// Admin (RBAC: role=admin)
@@ -79,6 +95,7 @@ func Router(d Deps) http.Handler {
 			r.Post("/api/admin/questions", adm.createQuestion)
 			r.Get("/api/admin/questions", adm.listQuestions)
 			r.Delete("/api/admin/questions/{id}", adm.deleteQuestion)
+			r.Post("/api/admin/tournaments", th.create)
 		})
 	}
 
@@ -109,18 +126,4 @@ func wsAuth(svc *auth.Service) ws.AuthFunc {
 func health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
-}
-
-// cors — DEV uchun ochiq CORS. PROD'da origin ro'yxati bilan cheklanadi.
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }

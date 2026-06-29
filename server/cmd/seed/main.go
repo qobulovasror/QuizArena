@@ -1,6 +1,6 @@
 // Command seed — boshlang'ich ma'lumotni Postgres'ga yozadi (idempotent).
 //
-// Sohalar: english (generativ), math (generativ), general (statik bank).
+// Sohalar: english (generativ), math (generativ), general + programming (statik bank).
 // english/math savollari provider tomonidan generatsiya qilinadi; general savollari
 // shu yerda DB'ga yoziladi (GeneralProvider o'qiydi).
 // Ishga tushirish: DATABASE_URL=... go run ./cmd/seed   (yoki `make seed`).
@@ -51,6 +51,15 @@ func main() {
 	gen := ensureSubject("general", "Umumiy bilim", "🌍")
 	gcat := ensureCategory(gen.ID, "mixed", "Aralash")
 	seedGeneral(gcat.ID)
+
+	// Yangi savol formatlari (ordering/cloze/match/categorize) — namuna bank.
+	tcat := ensureCategory(gen.ID, "formats", "Turli formatlar")
+	seedTypes(tcat.ID)
+
+	// programming — statik bank (terminologiya, kod natijasi). General provider o'qiydi.
+	prog := ensureSubject("programming", "Dasturlash", "💻")
+	pcat := ensureCategory(prog.ID, "fundamentals", "Asoslar")
+	seedProgramming(pcat.ID)
 
 	log.Println("seed tugadi ✓")
 }
@@ -154,6 +163,129 @@ func seedGeneral(categoryID uuid.UUID) {
 		}
 	}
 	log.Printf("✓ general savollar: %d", len(questions))
+}
+
+func seedProgramming(categoryID uuid.UUID) {
+	n, err := q.CountQuestionsByCategory(ctx, categoryID)
+	if err != nil {
+		log.Fatalf("savol soni: %v", err)
+	}
+	if n > 0 {
+		log.Printf("• programming savollar mavjud (%d)", n)
+		return
+	}
+	questions := []store.CreateQuestionParams{
+		mcqQ("HTTP qaysi portda standart ishlaydi?", "HTTP — 80, HTTPS — 443.",
+			[][2]string{{"a", "21"}, {"b", "80"}, {"c", "443"}, {"d", "8080"}}, "b"),
+		mcqQ("Qaysi tuzilma «FIFO» (birinchi kirgan birinchi chiqadi)?", "Queue — FIFO; Stack — LIFO.",
+			[][2]string{{"a", "Stack"}, {"b", "Queue"}, {"c", "Tree"}, {"d", "Graph"}}, "b"),
+		mcqQ("Binary qidiruvning vaqt murakkabligi?", "Saralangan massivda O(log n).",
+			[][2]string{{"a", "O(n)"}, {"b", "O(n²)"}, {"c", "O(log n)"}, {"d", "O(1)"}}, "c"),
+		mcqQ("Git'da o'zgarishlarni tasdiqlash buyrug'i?", "git commit.",
+			[][2]string{{"a", "git push"}, {"b", "git commit"}, {"c", "git stage"}, {"d", "git save"}}, "b"),
+		mcqQ("`SELECT` SQL buyrug'i nima qiladi?", "Ma'lumotni o'qiydi (o'zgartirmaydi).",
+			[][2]string{{"a", "O'chiradi"}, {"b", "Yangilaydi"}, {"c", "O'qiydi"}, {"d", "Qo'shadi"}}, "c"),
+		tfQ("Stack «LIFO» (oxirgi kirgan birinchi chiqadi) tamoyilida ishlaydi.", "To'g'ri.", true),
+		tfQ("HTML — bu dasturlash tili.", "Noto'g'ri, HTML — belgilash (markup) tili.", false),
+		tfQ("`==` va `===` JavaScript'da bir xil ishlaydi.", "Noto'g'ri, `===` tip ham tekshiradi.", false),
+	}
+	for _, p := range questions {
+		p.CategoryID = categoryID
+		if _, err := q.CreateQuestion(ctx, p); err != nil {
+			log.Fatalf("savol yozish: %v", err)
+		}
+	}
+	log.Printf("✓ programming savollar: %d", len(questions))
+}
+
+// seedTypes — har yangi turdan bittadan namuna (ordering/cloze/match/categorize/anagram/type_answer).
+func seedTypes(categoryID uuid.UUID) {
+	n, err := q.CountQuestionsByCategory(ctx, categoryID)
+	if err != nil {
+		log.Fatalf("savol soni: %v", err)
+	}
+	if n > 0 {
+		log.Printf("• format savollar mavjud (%d)", n)
+		return
+	}
+	questions := []store.CreateQuestionParams{
+		orderingQ("So'zlardan to'g'ri jumla tuzing:", "To'g'ri tartib: I like tea.",
+			[][2]string{{"o1", "I"}, {"o2", "like"}, {"o3", "tea"}}, []string{"o1", "o2", "o3"}),
+		clozeQ("Bo'sh joylarni to'ldiring: 2 + 2 = ___ , 10 − 4 = ___", "4 va 6.",
+			[][]string{{"4"}, {"6"}}),
+		matchQ("So'zni tarjimasiga moslang:", "cat → mushuk, dog → it.",
+			[][2]string{{"l1", "cat"}, {"l2", "dog"}}, [][2]string{{"r1", "mushuk"}, {"r2", "it"}},
+			map[string]string{"l1": "r1", "l2": "r2"}),
+		categorizeQ("So'zlarni turkumga ajrating:", "olma/nok — meva; mushuk — hayvon.",
+			[][2]string{{"i1", "olma"}, {"i2", "mushuk"}, {"i3", "nok"}},
+			[][2]string{{"c1", "Meva"}, {"c2", "Hayvon"}},
+			map[string]string{"i1": "c1", "i2": "c2", "i3": "c1"}),
+		anagramQ("Harflardan so'z tuz: T-E-N-W", "Aralash harflar: went.", []string{"went"}),
+		typeAnswerQ("«go» fe'lining 2-shakli?", "go → went.", []string{"went"}),
+	}
+	for _, p := range questions {
+		p.CategoryID = categoryID
+		if _, err := q.CreateQuestion(ctx, p); err != nil {
+			log.Fatalf("savol yozish: %v", err)
+		}
+	}
+	log.Printf("✓ format savollar: %d", len(questions))
+}
+
+// optsFrom — [id,text] juftliklarini {id,text} obyektlariga (state.Option JSON).
+func optsFrom(pairs [][2]string) []map[string]string {
+	out := make([]map[string]string, len(pairs))
+	for i, p := range pairs {
+		out[i] = map[string]string{"id": p[0], "text": p[1]}
+	}
+	return out
+}
+
+func orderingQ(prompt, expl string, items [][2]string, order []string) store.CreateQuestionParams {
+	ob, _ := json.Marshal(optsFrom(items))
+	cb, _ := json.Marshal(map[string][]string{"order": order})
+	e := expl
+	return store.CreateQuestionParams{Type: "ordering", Prompt: prompt, Options: ob, Correct: cb, Explanation: &e, Difficulty: 1}
+}
+
+func clozeQ(prompt, expl string, accepted [][]string) store.CreateQuestionParams {
+	blanks := make([]map[string][]string, len(accepted))
+	for i, a := range accepted {
+		blanks[i] = map[string][]string{"accepted": a}
+	}
+	cb, _ := json.Marshal(map[string]any{"blanks": blanks})
+	e := expl
+	return store.CreateQuestionParams{Type: "cloze", Prompt: prompt, Correct: cb, Explanation: &e, Difficulty: 1}
+}
+
+func matchQ(prompt, expl string, left, right [][2]string, pairs map[string]string) store.CreateQuestionParams {
+	ob, _ := json.Marshal(optsFrom(left))
+	cb, _ := json.Marshal(map[string]map[string]string{"pairs": pairs})
+	mb, _ := json.Marshal(map[string]any{"targets": optsFrom(right)})
+	e := expl
+	return store.CreateQuestionParams{Type: "match", Prompt: prompt, Options: ob, Correct: cb, Meta: mb, Explanation: &e, Difficulty: 1}
+}
+
+func categorizeQ(prompt, expl string, items, cats [][2]string, assign map[string]string) store.CreateQuestionParams {
+	ob, _ := json.Marshal(optsFrom(items))
+	cb, _ := json.Marshal(map[string]map[string]string{"assign": assign})
+	mb, _ := json.Marshal(map[string]any{"targets": optsFrom(cats)})
+	e := expl
+	return store.CreateQuestionParams{Type: "categorize", Prompt: prompt, Options: ob, Correct: cb, Meta: mb, Explanation: &e, Difficulty: 1}
+}
+
+// typeAnswerQ — matnli javob: correct = {accepted:[...]}; options yo'q.
+func typeAnswerQ(prompt, expl string, accepted []string) store.CreateQuestionParams {
+	cb, _ := json.Marshal(map[string][]string{"accepted": accepted})
+	e := expl
+	return store.CreateQuestionParams{Type: "type_answer", Prompt: prompt, Correct: cb, Explanation: &e, Difficulty: 1}
+}
+
+// anagramQ — aralash harflar prompt'da; baholanishi type_answer kabi (accepted ro'yxati).
+func anagramQ(prompt, expl string, accepted []string) store.CreateQuestionParams {
+	cb, _ := json.Marshal(map[string][]string{"accepted": accepted})
+	e := expl
+	return store.CreateQuestionParams{Type: "anagram", Prompt: prompt, Correct: cb, Explanation: &e, Difficulty: 1}
 }
 
 func mcqQ(prompt, expl string, opts [][2]string, correctID string) store.CreateQuestionParams {

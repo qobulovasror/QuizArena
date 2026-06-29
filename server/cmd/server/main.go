@@ -60,6 +60,12 @@ func main() {
 	} else {
 		registry.Register("general", providers.NewGeneral(queries, gen.ID))
 	}
+	// programming — statik DB bank (General provider). Seed orqali to'ldiriladi.
+	if prog, err := queries.GetSubjectBySlug(context.Background(), "programming"); err != nil {
+		logger.Warn("programming soha topilmadi — `make seed` ishga tushiring", "err", err)
+	} else {
+		registry.Register("programming", providers.NewGeneral(queries, prog.ID))
+	}
 
 	persister := persist.NewDB(queries)
 	engine := game.NewEngine(hub, liveStore, registry, persister, logger)

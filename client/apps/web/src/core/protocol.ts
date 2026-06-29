@@ -16,6 +16,7 @@ export interface Player {
   connected: boolean;
   isBot?: boolean;
   eliminated?: boolean;
+  team?: string;
 }
 
 export interface RoomConfig {
@@ -37,6 +38,14 @@ export interface LeaderboardEntry {
   correctCnt: number;
   rank: number;
   eliminated?: boolean;
+  team?: string;
+}
+
+export interface TeamStanding {
+  team: string;
+  score: number;
+  correctCnt: number;
+  rank: number;
 }
 
 export interface RoomStateData {
@@ -64,6 +73,7 @@ export interface QuestionShowData {
   type: string;
   prompt: string;
   options?: Option[];
+  targets?: Option[]; // match(o'ng)/categorize(toifa)
   deadlineTs: number;
 }
 
@@ -72,13 +82,24 @@ export interface QuestionRevealData {
   correct: { optionId?: string } | unknown;
   explanation?: string;
   leaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[];
 }
 
 export interface GameOverData {
   finalLeaderboard: LeaderboardEntry[];
+  teams?: TeamStanding[];
 }
 
 export interface ErrorData {
   code: string;
   message: string;
+}
+
+// 🏆 Matchmaking (server→client). C→S (match:queue/cancel) store orqali inline yuboriladi.
+export interface MatchQueuedData {
+  subjectId: string;
+}
+export interface MatchFoundData {
+  sessionId: string;
+  vsBot: boolean;
 }

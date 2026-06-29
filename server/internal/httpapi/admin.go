@@ -72,6 +72,7 @@ type createQuestionReq struct {
 	Type        string          `json:"type" validate:"required"`
 	Prompt      string          `json:"prompt" validate:"required"`
 	Options     json.RawMessage `json:"options"`
+	Targets     json.RawMessage `json:"targets"` // match(o'ng)/categorize(toifa) → meta.targets
 	Correct     json.RawMessage `json:"correct" validate:"required"`
 	Accept      json.RawMessage `json:"accept"`
 	Explanation string          `json:"explanation"`
@@ -92,10 +93,14 @@ func (h *adminHandler) createQuestion(w http.ResponseWriter, r *http.Request) {
 	if diff == 0 {
 		diff = 1
 	}
+	var meta []byte // match/categorize: o'ng tomon/toifalar meta.targets'da
+	if len(req.Targets) > 0 {
+		meta, _ = json.Marshal(map[string]json.RawMessage{"targets": req.Targets})
+	}
 	q, err := h.q.CreateQuestion(r.Context(), store.CreateQuestionParams{
 		CategoryID: cid, Type: req.Type, Prompt: req.Prompt,
 		Options: req.Options, Correct: req.Correct, Accept: req.Accept,
-		Explanation: expl, Difficulty: diff,
+		Explanation: expl, Difficulty: diff, Meta: meta,
 	})
 	if err != nil {
 		h.logger.Error("admin createQuestion", "err", err)

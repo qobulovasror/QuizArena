@@ -8,6 +8,25 @@ import { Card } from "../components/ui/card";
 
 const OPT_IDS = ["a", "b", "c", "d"];
 
+const QTYPES = ["mcq", "true_false", "numeric", "type_answer", "anagram", "ordering", "cloze", "match", "categorize"];
+const BULK_TYPES = ["ordering", "cloze", "match", "categorize"];
+// type_answer/anagram — bitta textarea: qabul qilinadigan javoblar (sinonim) ro'yxati.
+const TEXT_TYPES = ["type_answer", "anagram"];
+
+// bo'sh bo'lmagan, trim qilingan qatorlar
+const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+// vergul yoki yangi qator bilan ajratilgan qabul qilinadigan javoblar
+const accepted = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+
+const bulkHint: Record<string, string> = {
+  ordering: "Elementlar TO'G'RI tartibda, har biri yangi qatorda.",
+  cloze: "Savol matniga ___ qo'ying. Bu yerga har bo'shliq javobi (sinonim = vergul), yangi qatorda.",
+  match: "Har qatorda: chap = o'ng (masalan: cat = mushuk).",
+  categorize: "Har qatorda: element = Toifa (masalan: olma = Meva).",
+  type_answer: "Qabul qilinadigan javoblar (sinonim), vergul yoki yangi qator bilan.",
+  anagram: "Harflarni promptga yozing (masalan: T-E-N-W). Bu yerga to'g'ri so'z(lar), vergul bilan.",
+};
+
 export function AdminPage() {
   const token = useGame((s) => s.token)!;
   const subjects = useGame((s) => s.subjects);
@@ -26,10 +45,19 @@ export function AdminPage() {
   const [correctIdx, setCorrectIdx] = useState(0);
   const [tfValue, setTfValue] = useState(true);
   const [numValue, setNumValue] = useState("");
+  const [bulk, setBulk] = useState(""); // ordering/cloze/match/categorize uchun matn kiritish
   const [expl, setExpl] = useState("");
 
   // yangi kategoriya
   const [newCat, setNewCat] = useState("");
+
+  // turnir formi
+  const [tnTitle, setTnTitle] = useState("");
+  const [tnSubject, setTnSubject] = useState("");
+  const [tnCount, setTnCount] = useState("5");
+  const [tnStart, setTnStart] = useState("");
+  const [tnEnd, setTnEnd] = useState("");
+  const [tnMsg, setTnMsg] = useState("");
 
   useEffect(() => {
     loadSubjects();
@@ -37,7 +65,8 @@ export function AdminPage() {
 
   useEffect(() => {
     if (subjects.length && !subjectId) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (subjects.length && !tnSubject) setTnSubject(subjects[0].slug);
+  }, [subjects, subjectId, tnSubject]);
 
   const loadCats = useCallback(async () => {
     if (!subjectId) return;
@@ -76,6 +105,25 @@ export function AdminPage() {
       body.correct = { value: tfValue };
     } else if (type === "numeric") {
       body.correct = { value: Number(numValue), tolerance: 0 };
+    } else if (TEXT_TYPES.includes(type)) {
+      body.correct = { accepted: accepted(bulk) };
+    } else if (type === "ordering") {
+      const items = lines(bulk);
+      body.options = items.map((tx, i) => ({ id: `o${i + 1}`, text: tx }));
+      body.correct = { order: items.map((_, i) => `o${i + 1}`) };
+    } else if (type === "cloze") {
+      body.correct = { blanks: lines(bulk).map((l) => ({ accepted: l.split(",").map((x) => x.trim()).filter(Boolean) })) };
+    } else if (type === "match") {
+      const rows = lines(bulk).map((l) => l.split("="));
+      body.options = rows.map((r, i) => ({ id: `l${i + 1}`, text: (r[0] ?? "").trim() }));
+      body.targets = rows.map((r, i) => ({ id: `r${i + 1}`, text: (r[1] ?? "").trim() }));
+      body.correct = { pairs: Object.fromEntries(rows.map((_, i) => [`l${i + 1}`, `r${i + 1}`])) };
+    } else if (type === "categorize") {
+      const rows = lines(bulk).map((l) => l.split("="));
+      const catNames = [...new Set(rows.map((r) => (r[1] ?? "").trim()))];
+      body.options = rows.map((r, i) => ({ id: `i${i + 1}`, text: (r[0] ?? "").trim() }));
+      body.targets = catNames.map((n, i) => ({ id: `c${i + 1}`, text: n }));
+      body.correct = { assign: Object.fromEntries(rows.map((r, i) => [`i${i + 1}`, `c${catNames.indexOf((r[1] ?? "").trim()) + 1}`])) };
     }
     try {
       await api.adminCreateQuestion(body, token);
@@ -83,6 +131,7 @@ export function AdminPage() {
       setPrompt("");
       setOpts(["", "", "", ""]);
       setNumValue("");
+      setBulk("");
       setExpl("");
       loadQuestions();
     } catch (e) {
@@ -93,9 +142,37 @@ export function AdminPage() {
 
   async function addCategory() {
     if (!subjectId || !newCat) return;
-    await api.adminCreateCategory({ subjectId, slug: newCat.toLowerCase().replace(/\s+/g, "-"), name: newCat }, token).catch(() => {});
-    setNewCat("");
-    loadCats();
+    try {
+      await api.adminCreateCategory({ subjectId, slug: newCat.toLowerCase().replace(/\s+/g, "-"), name: newCat }, token);
+      setNewCat("");
+      loadCats();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "xato");
+      setTimeout(() => setMsg(""), 2500);
+    }
+  }
+
+  async function addTournament() {
+    if (!tnTitle || !tnSubject || !tnStart || !tnEnd) return;
+    try {
+      await api.adminCreateTournament(
+        {
+          title: tnTitle,
+          subjectSlug: tnSubject,
+          questionCount: Number(tnCount),
+          startsAt: new Date(tnStart).toISOString(),
+          endsAt: new Date(tnEnd).toISOString(),
+        },
+        token,
+      );
+      setTnMsg("✓ turnir yaratildi");
+      setTnTitle("");
+      setTnStart("");
+      setTnEnd("");
+    } catch (e) {
+      setTnMsg(e instanceof Error ? e.message : "xato");
+    }
+    setTimeout(() => setTnMsg(""), 2500);
   }
 
   return (
@@ -130,12 +207,12 @@ export function AdminPage() {
 
       <Card className="space-y-3">
         <h3 className="font-medium">Yangi savol</h3>
-        <div className="flex gap-2 text-sm">
-          {["mcq", "true_false", "numeric"].map((t) => (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {QTYPES.map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={"flex-1 rounded-lg py-1.5 " + (type === t ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500")}
+              className={"rounded-lg px-2.5 py-1.5 " + (type === t ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500")}
             >
               {t}
             </button>
@@ -162,8 +239,21 @@ export function AdminPage() {
         )}
         {type === "numeric" && <Input type="number" value={numValue} onChange={(e) => setNumValue(e.target.value)} placeholder="To'g'ri javob (raqam)" />}
 
+        {(BULK_TYPES.includes(type) || TEXT_TYPES.includes(type)) && (
+          <div className="space-y-1">
+            <textarea
+              value={bulk}
+              onChange={(e) => setBulk(e.target.value)}
+              rows={4}
+              placeholder={bulkHint[type]}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-slate-400">{bulkHint[type]}</p>
+          </div>
+        )}
+
         <Input value={expl} onChange={(e) => setExpl(e.target.value)} placeholder="Izoh (ixtiyoriy)" />
-        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt}>
+        <Button className="w-full" onClick={addQuestion} disabled={!categoryId || !prompt || ((BULK_TYPES.includes(type) || TEXT_TYPES.includes(type)) && !bulk.trim())}>
           Qo'shish
         </Button>
         {msg && <p className="text-center text-sm text-indigo-600">{msg}</p>}
@@ -178,8 +268,13 @@ export function AdminPage() {
             </span>
             <button
               onClick={async () => {
-                await api.adminDeleteQuestion(q.id, token).catch(() => {});
-                loadQuestions();
+                try {
+                  await api.adminDeleteQuestion(q.id, token);
+                  loadQuestions();
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "xato");
+                  setTimeout(() => setMsg(""), 2500);
+                }
               }}
               className="shrink-0 text-red-500 hover:text-red-700"
             >
@@ -188,6 +283,34 @@ export function AdminPage() {
           </div>
         ))}
         {questions.length === 0 && <p className="text-sm text-slate-400">Savol yo'q.</p>}
+      </Card>
+
+      <Card className="space-y-3">
+        <h3 className="font-medium">🏆 Yangi turnir</h3>
+        <Input value={tnTitle} onChange={(e) => setTnTitle(e.target.value)} placeholder="Turnir nomi" />
+        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={tnSubject} onChange={(e) => setTnSubject(e.target.value)}>
+          {subjects.map((s) => (
+            <option key={s.id} value={s.slug}>
+              {s.icon} {s.name}
+            </option>
+          ))}
+        </select>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Savol soni</label>
+          <Input type="number" value={tnCount} onChange={(e) => setTnCount(e.target.value)} placeholder="Savol soni" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Boshlanish</label>
+          <Input type="datetime-local" value={tnStart} onChange={(e) => setTnStart(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-slate-400">Tugash</label>
+          <Input type="datetime-local" value={tnEnd} onChange={(e) => setTnEnd(e.target.value)} />
+        </div>
+        <Button className="w-full" onClick={addTournament} disabled={!tnTitle || !tnSubject || !tnStart || !tnEnd}>
+          Turnir yaratish
+        </Button>
+        {tnMsg && <p className="text-center text-sm text-indigo-600">{tnMsg}</p>}
       </Card>
     </div>
   );

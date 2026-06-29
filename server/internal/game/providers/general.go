@@ -43,12 +43,20 @@ func (g *General) Questions(count int) ([]state.Question, error) {
 		if r.Explanation != nil {
 			expl = *r.Explanation
 		}
+		// match/categorize uchun o'ng tomon/toifalar meta.targets'da saqlanadi.
+		var meta struct {
+			Targets []state.Option `json:"targets"`
+		}
+		if len(r.Meta) > 0 {
+			_ = json.Unmarshal(r.Meta, &meta)
+		}
 		out = append(out, state.Question{
 			ID:          r.ID.String(),
 			Type:        r.Type,
 			Prompt:      r.Prompt,
 			Explanation: expl,
 			Options:     opts,
+			Targets:     meta.Targets,
 			Correct:     json.RawMessage(r.Correct),
 		})
 	}
