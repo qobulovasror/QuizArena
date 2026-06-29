@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "QuizArena",
+    "slug": "quizarena",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "quizarena",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true },
+    "android": { "package": "app.quizarena" }
+  }
+}

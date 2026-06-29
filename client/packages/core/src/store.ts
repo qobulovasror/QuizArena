@@ -12,6 +12,7 @@ import type {
 import { api } from "./api";
 import type { User, SubjectInfo } from "./api";
 import { getTelegram } from "./telegram";
+import { getWsBase } from "./config";
 
 let socket: WebSocket | null = null;
 let intentional = false; // ataylab yopilganda reconnect qilinmaydi
@@ -229,8 +230,9 @@ function open(set: (p: Partial<GameStore>) => void, get: () => GameStore, token:
   const first = get().status === "offline";
   set({ status: first ? "connecting" : "reconnecting" });
 
-  const scheme = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${scheme}://${location.host}/ws?token=${encodeURIComponent(token)}`);
+  // WS asosi: RN'da configureCore({wsBase}) bilan o'rnatiladi; web'da location'dan.
+  const base = getWsBase() || `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+  const ws = new WebSocket(`${base}/ws?token=${encodeURIComponent(token)}`);
   socket = ws;
 
   ws.onopen = () => {

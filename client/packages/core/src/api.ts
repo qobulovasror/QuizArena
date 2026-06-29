@@ -1,4 +1,6 @@
-// REST API client (auth). Dev'da Vite proxy orqali Go backend'ga.
+// REST API client (auth). Web'da Vite proxy orqali Go backend'ga (relative);
+// RN'da configureCore({apiBase}) bilan absolute asos o'rnatiladi.
+import { getApiBase } from "./config";
 
 export interface User {
   id: string;
@@ -21,7 +23,7 @@ export interface SubjectInfo {
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, {
+  const r = await fetch(getApiBase() + path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -34,19 +36,19 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path);
+  const r = await fetch(getApiBase() + path);
   if (!r.ok) throw new Error("so'rov xatosi");
   return r.json() as Promise<T>;
 }
 
 async function authGet<T>(path: string, token: string): Promise<T> {
-  const r = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  const r = await fetch(getApiBase() + path, { headers: { Authorization: `Bearer ${token}` } });
   if (!r.ok) throw new Error("so'rov xatosi");
   return r.json() as Promise<T>;
 }
 
 async function authPost<T>(path: string, body: unknown, token: string): Promise<T> {
-  const r = await fetch(path, {
+  const r = await fetch(getApiBase() + path, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -59,7 +61,7 @@ async function authPost<T>(path: string, body: unknown, token: string): Promise<
 }
 
 async function authDelete(path: string, token: string): Promise<void> {
-  const r = await fetch(path, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  const r = await fetch(getApiBase() + path, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
   if (!r.ok) throw new Error("o'chirib bo'lmadi");
 }
 
