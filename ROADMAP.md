@@ -88,6 +88,39 @@ Tartib **qiymat ÷ xavf ÷ bog'liqlik** bo'yicha. Har band — bitta branch + bi
 
 ---
 
+## 3.5 Qo'shimcha — PLAN'da bor, lekin yuqoridagi Tier'larda tushirib qoldirilgan
+
+Bular PLAN.md'da yozilgan reja punktlari (Tier ro'yxatiga keyin qo'shilsin):
+
+| Punkt | Rejada | Holat |
+|---|---|---|
+| **`spelling`** turi | §5 2-guruh | yo'q (`type_answer` patternida qilsa bo'ladi) |
+| **`multi_select`** client UI | §5 1-guruh, B2 | server validatsiyasi bor, PlayPage chizmaydi |
+| Bot **`/stats`** komandasi | Bosqich 2 | hozir faqat `/start` |
+| **Bulk import** (admin) | §8, Bosqich 6 | `POST /api/admin/questions` bittalab; ommaviy yo'q |
+| **Profil / o'yin tarixi UI** | Bosqich 6 | `GET /api/me/history` endpoint bor, sahifa yo'q |
+| **`packages/ui-web`** | §10 | shadcn umumiy komponentlar paketi — bo'sh placeholder |
+
+## 3.6 Reja TASHQARISI — ops amallari va ma'lum cheklovlar
+
+Bular **spetsifikatsiya emas** — ish davomida chiqqan (ops yoki review). Roadmap punkti emas, lekin kuzatib borish kerak.
+
+### Ops amallari (kod emas — foydalanuvchi bajaradi)
+- **Migratsiyalarni qo'llash**: `make tools` (goose) → `DATABASE_URL=... make migrate-up` — `00006_rating`, `00007_tournaments` (aks holda ELO/turnir ishlamaydi). *DB kerak.*
+- **`make seed`** — yangi namuna savollar.
+- **Branch** `b2-b3-rejimlar` → `main` merge + **push** (push qilinmagan).
+- `.github/`, `CLAUDE.md`, `PLAN.md` ni commit qilish (hali untracked).
+
+### Ma'lum cheklovlar / review-buglar (past daraja)
+- **RN** ilovasi jonli build/test qilinmagan (Expo muhiti yo'q).
+- **`startDuel` disconnect TOCTOU** — juftlash oynasida o'yinchi uzilsa fantom duel (kam UX nuqsoni).
+- **`GetQuestionByID` N+1** — assess/turnir submit'da har javobga alohida DB so'rovi (perf, `WHERE id = ANY(...)` bilan jamlasa bo'ladi).
+- **`hangman`/`word_search`** — bir-javob-har-savol engine'iga to'g'ri kelmaydi (interaktiv per-harf/grid protokol = engine kengaytmasi kerak).
+- **Eski TODO'lar**: Telegram `auth_date` replay himoyasi (`telegram.go`); engine early-advance (hamma javob bersa deadline'siz keyingisiga o'tish).
+- **`assess.go`** variantlarni aralashtirmaydi (turnir'da tuzatildi; eski kod, `ordering` UI yo'qligi sabab ta'siri nol).
+
+---
+
 ## 4. Ishlov Workflow (har bir stage uchun)
 
 ```
