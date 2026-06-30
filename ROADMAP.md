@@ -8,26 +8,26 @@
 
 ## 1. Hozirgi holat (2026-06)
 
-### ✅ Tugagan (commit qilingan yoki shu sessiyada)
+### ✅ Tugagan (barchasi commit qilingan — 64 Go test, web build toza)
 | Bosqich | Nima | Holat |
 |---|---|---|
 | B0 | Poydevor: config, Docker, sqlc/goose quvuri, `state.Store`, Hub | ✅ |
 | B1 | Auth (mehmon+akkaunt+JWT), host-led xona, classic, server-authoritative, reconnect, `deadlineTs`, persist, i18n, English provider | ✅ |
-| B2 | math/general/**programming** providerlar, admin CRUD, **9 savol turi** (mcq, true_false, numeric, type_answer, multi_select, **match, ordering, categorize, cloze**) — barchasi end-to-end o'ynaladigan | ✅ |
+| B2 | math/general/**programming** providerlar, admin CRUD, **10 savol turi** (mcq, true_false, numeric, type_answer, fill_blank, multi_select*, **match, ordering, categorize, cloze, anagram**) — `multi_select`'dan boshqasi end-to-end o'ynaladigan | ✅ |
 | B3 | Rejimlar: classic, survival, **time_attack** (per-player), **team** (jamoa reytingi) | ✅ |
 | B4 | SRS (practice, SM-2), Mastery (assessment, EMA) | ✅ |
-| B5 | **BotPlayer** (sinxron rejimlar), **Matchmaking 1v1 + ELO** (`user_rating`, duel, bot-fallback) | ✅ (commit kutmoqda) |
-| — | `answers_log` auditi (DB-savollar uchun) | ✅ |
-| Telegram | Mini App auth + minimal bot (`/start`) | ✅ |
+| B5 | **BotPlayer** (qiyilik darajalari, sinxron + time_attack), **Matchmaking 1v1 + ELO** (`user_rating`, duel, bot-fallback), **Turnirlar** (asinxron, server-authoritative ball, leaderboard) | ✅ |
+| B6 | **Global leaderboard** + **reyting ko'rinishi** UI (Reyting tab) | ✅ |
+| — | `answers_log` auditi; **xavfsizlik** (rate-limit, secure headers, CORS); **frontend sayqal** | ✅ |
+| Arxitektura | **`packages/core` ajratildi** (platforma-agnostik: `configureCore`, `@core/*`) | ✅ |
+| Platforma | Telegram Mini App (auth + bot `/start`) + **RN skeleton** (`apps/native`, Expo) | ✅ / ⚠️ RN test qilinmagan |
 
-### ⏳ Ochiq texnik qarz / qo'llanilmagan
-- **Matchmaking stage commit qilinmagan** (`?? matchmaking.go, rating/, 00006_rating.sql, ...`).
-- **Migratsiya 00006 qo'llanilmagan** — `make migrate-up` kerak (goose **o'rnatilmagan**, DB ulanmagan).
-- **Branch**: `b2-b3-rejimlar` 4 commit + ishchi o'zgarishlar — nomidan oshib ketgan, `main`ga merge kutmoqda.
-- **Begona ishchi fayllar** (men yozmaganman): `security.go`, `security_test.go`, `config.go`, `router.go`, `.env.example` — rate-limit/xavfsizlik ishi davom etmoqda. **Tegmaslik / egasidan so'rash**.
-- `CLAUDE.md`, `PLAN.md`, `.github/` — **hech qachon commit qilinmagan** (`??`).
-- Reyting raqami UI'da ko'rinmaydi (`GET /api/me/rating` bor, ko'rinish yo'q).
-- Yangi 4 turning reveal'da to'g'ri javobi inline ko'rsatilmaydi.
+### ⏳ Ochiq (faqat ops + §3.5/§3.6 qoldiqlar)
+- **Migratsiyalar qo'llanilmagan**: `00006_rating`, `00007_tournaments` — `make migrate-up` kerak (goose o'rnatilmagan, DB ulanmagan). **Aks holda ELO/turnir ishlamaydi.** → §3.6
+- **Branch** `b2-b3-rejimlar` `main`ga merge + **push qilinmagan**. → §3.6
+- `CLAUDE.md`, `PLAN.md`, `.github/` — hali untracked. → §3.6
+- Qolgan reja punktlari: **§3.5** (spelling, multi_select UI, `/stats`, bulk import, profil UI, ui-web) va **Tier 4** (media, kod, AI, scaling, CI/CD).
+- Ma'lum cheklovlar: **§3.6** (RN test, startDuel TOCTOU, N+1, hangman/word_search, eski TODO'lar).
 
 ---
 
@@ -61,18 +61,18 @@
 Tartib **qiymat ÷ xavf ÷ bog'liqlik** bo'yicha. Har band — bitta branch + bitta stage.
 
 ### Tier 0 — Gigiyena (avval)
-1. **Matchmaking stage commit** + `main`ga merge strategiyasini hal qilish.
-2. **Migratsiya 00006 qo'llash** (`make tools` → goose, `make migrate-up`) — ELO saqlanishi uchun. *Ops qadam, DB kerak.*
-3. `CLAUDE.md`/`PLAN.md`/`ROADMAP.md` ni commit qilish.
+1. ✅ **Matchmaking stage commit** (xavfsizlik alohida commit; HEAD toza quriladi). ⏳ `main`ga merge + push — **ops** (§3.6).
+2. ⏳ **Migratsiya qo'llash** (`make migrate-up` → `00006`, `00007`) — **ops, DB kerak** (§3.6). Migratsiya FAYLLARI yozildi ✅.
+3. ✅/⏳ `ROADMAP.md` commit qilindi; `CLAUDE.md`/`PLAN.md` hali untracked (§3.6).
 
 ### Tier 1 — Boshlangan ishni yopish (kichik, ko'rinadigan qiymat)
-4. **Reyting + Global leaderboard**: `/api/leaderboard/global` (`game_results`dan) + reyting/leaderboard ko'rinishi (profil yoki home). ELO halqasini ko'rinadigan qiladi.
-5. **Frontend sayqal**: `AssessPage` `alert()`→toast, jim `.catch()`lar, TS `any`/non-null; yangi turlar reveal'ida to'g'ri javob inline.
+4. ✅ **Reyting + Global leaderboard**: `/api/leaderboard/global` + reyting/leaderboard ko'rinishi (Reyting tab).
+5. ✅ **Frontend sayqal**: `alert()`→inline, jim `.catch()`lar, TS `any`/non-null, yangi turlar reveal'ida to'g'ri javob.
 
 ### Tier 2 — B5/B3 qoldig'i
-6. **Turnirlar** (B5): migratsiyalar + CRUD + asinxron natija + UI. Raqobat ustunini yakunlaydi.
-7. **So'z o'yinlari** (B3): `anagram`, `hangman` (qtype + client UI + seed); `word_search` keyin.
-8. **Bot kengaytmasi**: qiyinlik darajalari + `time_attack` bot.
+6. ✅ **Turnirlar** (B5): migratsiya + CRUD + asinxron + UI (server-authoritative ball, anti-cheat).
+7. ✅ **`anagram`** (+ `type_answer`/`fill_blank` o'ynaladigan). ⏳ `hangman`/`word_search` — engine'ga to'g'ri kelmaydi (§3.6).
+8. ✅ **Bot kengaytmasi**: qiyilik darajalari (oson/o'rta/qiyin) + `time_attack` bot.
 
 ### Tier 3 — Arxitektura & platformalar
 9. ✅ **`packages/core` ajratish** — bajarildi (core endi platforma-agnostik: `configureCore`, `@core/*` alias).
