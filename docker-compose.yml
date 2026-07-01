@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: quizarena
       POSTGRES_DB: quizarena
     ports:
-      - "5432:5432"
+      # Host tarafdagi port .env'dan (DB_PORT), default 5432. Konteyner ichi doim 5432.
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,12 +22,31 @@ services:
     build: ./server
     environment:
       PORT: "8080"
+      # Konteyner ichida DB host = "postgres" (compose servis nomi), localhost EMAS.
       DATABASE_URL: postgres://quizarena:quizarena@postgres:5432/quizarena?sslmode=disable
+      # Quyidagilar .env'dan olinadi (yo'q bo'lsa — default). Prod'da JWT_SECRET'ni to'ldiring.
+      ENV: ${ENV:-production}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     ports:
-      - "8080:8080"
+      # Host tarafdagi port .env'dan (APP_PORT), default 8080. Konteyner ichi doim 8080.
+      - "${APP_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Frontend (web) — Node bilan build qilinadi, nginx bilan tarqatiladi.
+  # Kontekst = client/ (monorepo), chunki apps/web packages/core'ga bog'liq.
+  web:
+    build:
+      context: ./client
+      dockerfile: apps/web/Dockerfile
+    ports:
+      # Host port .env'dan (WEB_PORT), default 8090. Konteyner ichi doim 80.
+      - "${WEB_PORT:-8090}:80"
+    depends_on:
+      - app
 
 volumes:
   pgdata:
